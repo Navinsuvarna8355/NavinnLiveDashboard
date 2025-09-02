@@ -1,6 +1,6 @@
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
-from upstox_api.api import Upstox, Session
+from upstox_python_sdk import Upstox
 from collections import Counter
 
 # 🔄 Auto-refresh every 60 seconds
