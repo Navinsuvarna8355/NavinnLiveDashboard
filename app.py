@@ -1,18 +1,21 @@
 import streamlit as st
 import requests
-from datetime import datetime
+from urllib.parse import quote
 
 # =========================
-# 1️⃣ NSE SCRAPER (embedded)
+# 1️⃣ NSE SCRAPER (embedded & fixed)
 # =========================
 class Nse:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-            "User-Agent": "Mozilla/5.0",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br"
+            "Accept-Encoding": "gzip, deflate, br",
+            "Referer": "https://www.nseindia.com/"
         })
+        # Pre‑hit homepage to get cookies
+        self.session.get("https://www.nseindia.com", timeout=5)
 
     def get_index_quote(self, symbol_name: str):
         """
@@ -20,10 +23,10 @@ class Nse:
         symbol_name examples: 'NIFTY 50', 'NIFTY BANK', 'S&P BSE SENSEX'
         """
         try:
-            url = f"https://www.nseindia.com/api/equity-stockIndices?index={symbol_name}"
+            encoded_symbol = quote(symbol_name)
+            url = f"https://www.nseindia.com/api/equity-stockIndices?index={encoded_symbol}"
             r = self.session.get(url, timeout=5)
             data = r.json()
-            # NSE returns a list of data points; find matching symbol
             for item in data.get("data", []):
                 if item.get("index") == symbol_name:
                     return {"lastPrice": item.get("lastPrice")}
@@ -62,7 +65,7 @@ def get_ema_trend(symbol_name: str):
 
 def get_pcr_atm_sr(symbol: str):
     # TODO: Replace with your PCR + ATM Strike + Support/Resistance logic
-    return 1.2, 19850, 19850, 19700, 20000
+    return 1.24, 19850, 19850, 19700, 20000
 
 def interpret_pcr(pcr_value: float):
     if pcr_value is None:
@@ -85,9 +88,13 @@ for key, sym in symbol_map.items():
         st.subheader(key)
 
     with col2:
+        # Spot Price from fixed scraper
         spot_price = get_spot_price(sym['nse_symbol'])
+
+        # EMA Trend
         ema_trend = get_ema_trend(sym['nse_symbol'])
 
+        # PCR + ATM + SR
         if sym['oc_symbol']:
             pcr_value, spot_from_pcr, atm_strike, support, resistance = get_pcr_atm_sr(sym['oc_symbol'])
         else:
@@ -95,6 +102,7 @@ for key, sym in symbol_map.items():
 
         pcr_trend = interpret_pcr(pcr_value)
 
+        # Display metrics
         st.markdown(f"**Spot Price:** {spot_price}")
         st.markdown(f"**EMA Trend:** {ema_trend}")
         st.markdown(f"**PCR Value:** {pcr_value if pcr_value else 'N/A'} → {pcr_trend}")
