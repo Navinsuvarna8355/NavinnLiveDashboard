@@ -12,7 +12,7 @@ st.title("📊 Market Signal Dashboard")
 # 🔐 API credentials
 API_KEY = "adc99325-baf1-4b04-8c94-b1502e573924"
 API_SECRET = "hoxszn7cr3"
-REDIRECT_URI = "http://localhost:8000"
+REDIRECT_URI = "https://navinn.streamlit.app"
 
 # 🔗 Login flow
 if "access_token" not in st.session_state:
