@@ -23,24 +23,17 @@ symbols = [
 # --------------------
 def get_nse_ohlc(symbol_name):
     session = requests.Session()
-    # Step 1: Get cookies
     session.get("https://www.nseindia.com", headers=headers)
-    
-    # Step 2: Hit chart API
     chart_url = f"https://www.nseindia.com/api/chart-databyindex?index={symbol_name.replace(' ', '%20')}&indices=true"
     rc = session.get(chart_url, headers=headers)
 
-    # Step 3: Safe JSON parse
     try:
         chart_data = rc.json()
     except json.JSONDecodeError:
-        st.warning(f"{symbol_name}: Market closed or data unavailable")
         return pd.DataFrame()
 
-    # Step 4: Extract candles
     candles = chart_data.get('grapthData', [])
     if not candles:
-        st.warning(f"{symbol_name}: No candle data")
         return pd.DataFrame()
 
     df = pd.DataFrame(candles, columns=["timestamp", "close"])
@@ -66,11 +59,28 @@ def get_ema_trend(symbol_name):
         return "Sideways"
 
 # --------------------
-# PCR from NSE Option Chain
+# Spot Price from NSE
 # --------------------
-def get_pcr(symbol):
-    if not symbol:
+def get_spot_price(symbol_name):
+    session = requests.Session()
+    session.get("https://www.nseindia.com", headers=headers)
+    url = f"https://www.nseindia.com/api/equity-stockIndices?index={symbol_name.replace(' ', '%20')}"
+    r = session.get(url, headers=headers)
+    try:
+        data = r.json()
+    except json.JSONDecodeError:
         return None
+    for item in data.get("data", []):
+        if item.get("indexName") == symbol_name:
+            return item.get("last")
+    return None
+
+# --------------------
+# PCR + ATM Strike from NSE Option Chain
+# --------------------
+def get_pcr_and_atm(symbol):
+    if not symbol:
+        return None, None
     session = requests.Session()
     session.get("https://www.nseindia.com/option-chain", headers=headers)
     url = f"https://www.nseindia.com/api/option-chain-indices?symbol={symbol}"
@@ -78,24 +88,34 @@ def get_pcr(symbol):
     try:
         data = json.loads(response.text)
     except json.JSONDecodeError:
-        st.warning(f"{symbol}: PCR data unavailable")
-        return None
+        return None, None
+
+    spot_price = data.get("records", {}).get("underlyingValue", None)
 
     expiry_dates = data.get("records", {}).get("expiryDates", [])
     if not expiry_dates:
-        return None
+        return None, spot_price
     current_expiry = expiry_dates[0]
+
     total_ce_oi = total_pe_oi = 0
+    strikes = []
     for item in data['records']['data']:
         if item["expiryDate"] == current_expiry:
+            strike = item.get("strikePrice")
+            strikes.append(strike)
             total_ce_oi += item.get("CE", {}).get("openInterest", 0)
             total_pe_oi += item.get("PE", {}).get("openInterest", 0)
-    return total_pe_oi / total_ce_oi if total_ce_oi else None
+
+    pcr = total_pe_oi / total_ce_oi if total_ce_oi else None
+    atm_strike = min(strikes, key=lambda x: abs(x - spot_price)) if spot_price and strikes else None
+    return pcr, atm_strike
 
 # --------------------
 # PCR Interpretation
 # --------------------
 def interpret_pcr(pcr):
+    if pcr is None:
+        return None
     if pcr > 1.3:
         return "Bullish"
     elif pcr < 0.7:
@@ -118,14 +138,15 @@ def color_for_trend(trend):
 # Streamlit UI
 # --------------------
 st.set_page_config(page_title="Live NSE EMA & PCR Dashboard", layout="wide")
-st.title("📊 Live NSE EMA & PCR Dashboard")
+st.title("📊 Live NSE EMA, PCR, Spot & ATM Dashboard")
 
 for sym in symbols:
     ema_trend = get_ema_trend(sym['nse_symbol'])
-    pcr_value = get_pcr(sym['oc_symbol'])
+    spot_price = get_spot_price(sym['nse_symbol'])
+    pcr_value, atm_strike = get_pcr_and_atm(sym['oc_symbol'])
     pcr_trend = interpret_pcr(pcr_value) if pcr_value is not None else None
     
-    col1, col2, col3, col4 = st.columns([1,1,1,1])
+    col1, col2, col3, col4, col5, col6 = st.columns([1,1,1,1,1,1])
     with col1:
         st.subheader(sym['name'])
     with col2:
@@ -143,5 +164,15 @@ for sym in symbols:
             st.metric("PCR Trend", f"{color_for_trend(pcr_trend)} {pcr_trend}")
         else:
             st.write("—")
+    with col5:
+        if spot_price:
+            st.metric("Spot Price", f"{spot_price:.2f}")
+        else:
+            st.write("—")
+    with col6:
+        if atm_strike:
+            st.metric("ATM Strike", f"{atm_strike}")
+        else:
+            st.write("—")
 
-st.caption("🔄 Market closed hone par EMA/PCR unavailable ho sakta hai. Market hours me refresh karke dekhein.")
+st.caption("🔄 Market closed hone par EMA/PCR/Spot/ATM unavailable ho sakta hai. Market hours me refresh karke dekhein.")
