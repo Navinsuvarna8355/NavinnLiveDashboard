@@ -1,58 +1,51 @@
 import streamlit as st
-import requests
-import pandas as pd
-from datetime import datetime, timedelta
+from nse_scrap import Nse  # tumhara diya hua NSE scraper module
 
 # =========================
 # 1️⃣ CONFIG & SYMBOLS
 # =========================
-st.set_page_config(page_title="Market Dashboard", layout="wide")
+st.set_page_config(page_title="Market Strategy Dashboard", layout="wide")
 
-# Map for consistent API calls
 symbol_map = {
     "NIFTY": {"oc_symbol": "NIFTY", "nse_symbol": "NIFTY 50"},
     "BANKNIFTY": {"oc_symbol": "BANKNIFTY", "nse_symbol": "NIFTY BANK"},
     "SENSEX": {"oc_symbol": None, "nse_symbol": "S&P BSE SENSEX"}
 }
 
+# NSE scraper init
+nse = Nse()
+
 # =========================
 # 2️⃣ DATA FETCHING
 # =========================
 def get_spot_price(symbol_name: str):
     """
-    Fetch latest spot/close price from NSE/BSE.
-    Replace with your preferred API.
+    Get live spot/close price using your NSE scrape logic.
     """
     try:
-        # Example NSE API endpoint (replace if using paid API)
-        url = f"https://www.nseindia.com/api/quote-equity?symbol={symbol_name}"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(url, headers=headers, timeout=5)
-        data = r.json()
-        return data['priceInfo']['lastPrice']
+        quote = nse.get_index_quote(symbol_name)
+        return quote['lastPrice']
     except Exception as e:
         st.error(f"Price fetch error for {symbol_name}: {e}")
         return None
 
 def get_ema_trend(symbol_name: str):
     """
-    Calculate EMA trend using spot price history.
-    Replace with your actual EMA logic.
+    Tumhara EMA calculation logic yahan lagao.
+    Abhi placeholder hai.
     """
-    # Example placeholder
     return "Bullish"
 
 def get_pcr_atm_sr(symbol: str):
     """
-    Fetch PCR, ATM Strike, Support, Resistance from option chain.
-    Replace with your actual logic.
+    Tumhara PCR + ATM Strike + Support/Resistance logic yahan lagao.
+    Abhi placeholder hai.
     """
-    # Example placeholder
     return 1.2, 19850, 19850, 19700, 20000
 
 def interpret_pcr(pcr_value: float):
     """
-    Interpret PCR value into a trend signal.
+    PCR value ko interpret karke trend return kare.
     """
     if pcr_value > 1.3:
         return "Bullish"
@@ -72,18 +65,16 @@ for key, sym in symbol_map.items():
         st.subheader(key)
 
     with col2:
-        # Unified spot price
+        # Spot Price from nse_scrap
         spot_price = get_spot_price(sym['nse_symbol'])
 
-        # EMA trend
+        # EMA Trend
         ema_trend = get_ema_trend(sym['nse_symbol'])
 
         # PCR + ATM + SR
-        pcr_value, atm_strike, support, resistance = None, None, None, None
         if sym['oc_symbol']:
             pcr_value, spot_from_pcr, atm_strike, support, resistance = get_pcr_atm_sr(sym['oc_symbol'])
         else:
-            # For SENSEX, PCR may not be available
             pcr_value, spot_from_pcr, atm_strike, support, resistance = None, None, None, None, None
 
         pcr_trend = interpret_pcr(pcr_value) if pcr_value is not None else "N/A"
