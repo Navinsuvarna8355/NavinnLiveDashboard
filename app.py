@@ -1,74 +1,51 @@
 import streamlit as st
 import requests
-import urllib.parse
+import pandas as pd
 
-# Load credentials from secrets
-API_KEY = st.secrets["UPSTOX_API_KEY"]
-API_SECRET = st.secrets["UPSTOX_API_SECRET"]
-REDIRECT_URI = st.secrets["UPSTOX_REDIRECT_URI"]
+st.set_page_config(page_title="📈 Bank Nifty Signals", layout="wide")
+st.title("📊 Bank Nifty Option Chain — NSE API")
 
-# Session state
-if "access_token" not in st.session_state:
-    st.session_state.access_token = None
+# NSE endpoint
+NSE_URL = "https://www.nseindia.com/api/option-chain-indices?symbol=BANKNIFTY"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+}
 
-# Step 1: Generate login URL
-def get_login_url():
-    base_url = "https://api.upstox.com/v2/login/authorization/dialog"
-    params = {
-        "response_type": "code",
-        "client_id": API_KEY,
-        "redirect_uri": REDIRECT_URI,
-    }
-    return f"{base_url}?{urllib.parse.urlencode(params)}"
+@st.cache_data(ttl=300)
+def fetch_option_chain():
+    session = requests.Session()
+    session.get("https://www.nseindia.com", headers=HEADERS)
+    response = session.get(NSE_URL, headers=HEADERS)
+    data = response.json()
+    return pd.DataFrame(data["records"]["data"])
 
-# Step 2: Exchange code for access token
-def get_access_token(auth_code):
-    url = "https://api.upstox.com/v2/login/authorization/token"
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    data = {
-        "code": auth_code,
-        "client_id": API_KEY,
-        "client_secret": API_SECRET,
-        "redirect_uri": REDIRECT_URI,
-        "grant_type": "authorization_code",
-    }
-    response = requests.post(url, headers=headers, data=data)
-    if response.status_code == 200:
-        return response.json()["access_token"]
-    else:
-        st.error("❌ Failed to get access token")
-        return None
+def extract_signals(df):
+    ce_data = []
+    pe_data = []
+    for row in df.itertuples():
+        strike = row.strikePrice
+        ce = row.CE if hasattr(row, "CE") else None
+        pe = row.PE if hasattr(row, "PE") else None
+        if ce:
+            ce_data.append([strike, ce["openInterest"], ce["changeinOpenInterest"]])
+        if pe:
+            pe_data.append([strike, pe["openInterest"], pe["changeinOpenInterest"]])
+    ce_df = pd.DataFrame(ce_data, columns=["Strike", "CE_OI", "CE_Change"])
+    pe_df = pd.DataFrame(pe_data, columns=["Strike", "PE_OI", "PE_Change"])
+    return ce_df, pe_df
 
-# Step 3: Fetch user profile
-def get_user_profile(token):
-    url = "https://api.upstox.com/v2/user/profile"
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        return response.json()["data"]
-    else:
-        st.error("❌ Failed to fetch profile")
-        return None
+df = fetch_option_chain()
+ce_df, pe_df = extract_signals(df)
 
-# UI
-st.title("📊 Upstox OAuth Login")
+col1, col2 = st.columns(2)
 
-if st.session_state.access_token:
-    st.success("✅ Logged in successfully!")
-    profile = get_user_profile(st.session_state.access_token)
-    if profile:
-        st.subheader("👤 User Profile")
-        st.json(profile)
-else:
-    query_params = st.experimental_get_query_params()
-    if "code" in query_params:
-        auth_code = query_params["code"][0]
-        with st.spinner("🔄 Authenticating..."):
-            token = get_access_token(auth_code)
-            if token:
-                st.session_state.access_token = token
-                st.experimental_rerun()
-    else:
-        login_url = get_login_url()
-        st.markdown(f"[🔐 Click here to login with Upstox]({login_url})")
+with col1:
+    st.subheader("📘 Call Options (CE)")
+    st.dataframe(ce_df.sort_values("CE_Change", ascending=False).head(10), use_container_width=True)
+
+with col2:
+    st.subheader("📕 Put Options (PE)")
+    st.dataframe(pe_df.sort_values("PE_Change", ascending=False).head(10), use_container_width=True)
 
