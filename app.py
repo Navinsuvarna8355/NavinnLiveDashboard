@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import upstox_client
 from upstox_client.api import LoginApi
-from upstox_client.models import *
+from upstox_client.models import AccessTokenRequest
 from collections import Counter
 import random
 
@@ -11,7 +11,7 @@ st_autorefresh(interval=60000, limit=100, key="dashboard_refresh")
 
 st.title("📊 Market Signal Dashboard")
 
-# 🔐 API credentials (hardcoded for now — use secrets.toml in production)
+# 🔐 API credentials
 API_KEY = "adc99325-baf1-4b04-8c94-b1502e573924"
 API_SECRET = "hoxszn7cr3"
 REDIRECT_URI = "http://localhost:8000"
@@ -32,7 +32,8 @@ if "access_token" not in st.session_state:
     code = st.text_input("Paste the code from Upstox redirect URL here:")
     if code:
         try:
-            token_response = login_api.get_access_token(code)
+            token_request = AccessTokenRequest(code=code)
+            token_response = login_api.get_access_token_using_post(token_request)
             st.session_state["access_token"] = token_response.access_token
             configuration.access_token = token_response.access_token
             st.success("✅ Logged in successfully!")
