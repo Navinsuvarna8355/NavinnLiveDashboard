@@ -1,44 +1,8 @@
 import streamlit as st
 import requests
-from urllib.parse import quote
 
 # =========================
-# 1️⃣ NSE SCRAPER (embedded & fixed)
-# =========================
-class Nse:
-    def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Referer": "https://www.nseindia.com/"
-        })
-        # Pre‑hit homepage to get cookies
-        self.session.get("https://www.nseindia.com", timeout=5)
-
-    def get_index_quote(self, symbol_name: str):
-        """
-        Fetch index quote from NSE India.
-        symbol_name examples: 'NIFTY 50', 'NIFTY BANK', 'S&P BSE SENSEX'
-        """
-        try:
-            encoded_symbol = quote(symbol_name)
-            url = f"https://www.nseindia.com/api/equity-stockIndices?index={encoded_symbol}"
-            r = self.session.get(url, timeout=5)
-            data = r.json()
-            for item in data.get("data", []):
-                if item.get("index") == symbol_name:
-                    return {"lastPrice": item.get("lastPrice")}
-            return {"lastPrice": None}
-        except Exception as e:
-            raise RuntimeError(f"NSE fetch error: {e}")
-
-# Init scraper
-nse = Nse()
-
-# =========================
-# 2️⃣ CONFIG & SYMBOLS
+# CONFIG & SYMBOLS
 # =========================
 st.set_page_config(page_title="Market Strategy Dashboard", layout="wide")
 
@@ -48,13 +12,17 @@ symbol_map = {
     "SENSEX": {"oc_symbol": None, "nse_symbol": "S&P BSE SENSEX"}
 }
 
+# Your proxy API base URL
+PROXY_URL = "https://my-nse-proxy.onrender.com"
+
 # =========================
-# 3️⃣ DATA FUNCTIONS
+# DATA FUNCTIONS
 # =========================
 def get_spot_price(symbol_name: str):
     try:
-        quote = nse.get_index_quote(symbol_name)
-        return quote['lastPrice']
+        r = requests.get(f"{PROXY_URL}/price/{symbol_name}", timeout=5)
+        data = r.json()
+        return data.get("lastPrice")
     except Exception as e:
         st.error(f"Price fetch error for {symbol_name}: {e}")
         return None
@@ -78,7 +46,7 @@ def interpret_pcr(pcr_value: float):
         return "Sideways"
 
 # =========================
-# 4️⃣ UI LAYOUT
+# UI LAYOUT
 # =========================
 st.title("📊 Market Strategy Dashboard")
 
@@ -88,13 +56,9 @@ for key, sym in symbol_map.items():
         st.subheader(key)
 
     with col2:
-        # Spot Price from fixed scraper
         spot_price = get_spot_price(sym['nse_symbol'])
-
-        # EMA Trend
         ema_trend = get_ema_trend(sym['nse_symbol'])
 
-        # PCR + ATM + SR
         if sym['oc_symbol']:
             pcr_value, spot_from_pcr, atm_strike, support, resistance = get_pcr_atm_sr(sym['oc_symbol'])
         else:
@@ -102,7 +66,6 @@ for key, sym in symbol_map.items():
 
         pcr_trend = interpret_pcr(pcr_value)
 
-        # Display metrics
         st.markdown(f"**Spot Price:** {spot_price}")
         st.markdown(f"**EMA Trend:** {ema_trend}")
         st.markdown(f"**PCR Value:** {pcr_value if pcr_value else 'N/A'} → {pcr_trend}")
