@@ -13,7 +13,7 @@ st.title("📊 Market Signal Dashboard")
 
 # 🔐 Load secrets
 API_KEY = st.secrets["adc99235-baf1-4b04-8c94-b1502e573924"]
-API_SECRET = st.secrets["UPSTOX_API_SECRET"]
+API_SECRET = st.secrets["hoxszn7cr3"]
 REDIRECT_URI = st.secrets["UPSTOX_REDIRECT_URI"]
 
 # ⚙️ Configure Upstox SDK
