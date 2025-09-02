@@ -26,7 +26,7 @@ login_api = LoginApi(api_client)
 
 # 🔗 Login flow
 if "access_token" not in st.session_state:
-    login_url = login_api.get_login_url()
+    login_url = f"https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id={API_KEY}&redirect_uri={REDIRECT_URI}"
     st.markdown(f"[🔐 Login to Upstox]({login_url})")
 
     code = st.text_input("Paste the code from Upstox redirect URL here:")
