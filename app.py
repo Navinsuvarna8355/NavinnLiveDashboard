@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 from upstox_python_sdk import Upstox
 from collections import Counter
+import random
 
 # 🔄 Auto-refresh every 60 seconds
 st_autorefresh(interval=60000, limit=100, key="dashboard_refresh")
@@ -9,13 +10,33 @@ st_autorefresh(interval=60000, limit=100, key="dashboard_refresh")
 st.title("📊 Market Signal Dashboard")
 
 # 🔐 Load secrets
-api_key = "adc99235-baf1-4b04-8c94-b1502e573924"      
-api_secret = "hoxszn7cr3"
-redirect_uri = "http://localhost:8000"
+API_KEY = st.secrets["adc99235-baf1-4b04-8c94-b1502e573924"]
+API_SECRET = st.secrets["hoxszn7cr3"]
+REDIRECT_URI = st.secrets["http://localhost:8000"]
 
-# 🧠 Dummy strategy logic (replace with real signal logic)
+# 🧠 Initialize Upstox SDK
+u = Upstox(api_key=API_KEY, api_secret=API_SECRET, redirect_uri=REDIRECT_URI)
+
+# 🔗 Login flow
+if "access_token" not in st.session_state:
+    login_url = u.get_login_url()
+    st.markdown(f"[🔐 Login to Upstox]({login_url})")
+
+    code = st.text_input("Paste the code from Upstox redirect URL here:")
+    if code:
+        try:
+            access_token = u.get_access_token(code)
+            u.set_access_token(access_token)
+            st.session_state["access_token"] = access_token
+            st.success("✅ Logged in successfully!")
+        except Exception as e:
+            st.error(f"Login failed: {e}")
+    st.stop()
+else:
+    u.set_access_token(st.session_state["access_token"])
+
+# 🧠 Dummy strategy logic (replace with real signals later)
 def get_strategy_signal(strategy_name):
-    import random
     return random.choice(["Buy CE", "Buy PE", "Sideways"])
 
 # 🧮 Aggregate final market view
@@ -41,4 +62,9 @@ for strat, signal in signals.items():
     st.metric(label=strat, value=signal)
 
 st.subheader("🧠 Final Market View")
-st.success(final_view)
+if final_view == "Buy CE":
+    st.success("📈 Bullish")
+elif final_view == "Buy PE":
+    st.error("📉 Bearish")
+else:
+    st.warning("🔄 Sideways")
