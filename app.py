@@ -1,6 +1,6 @@
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
-from upstox_python_sdk import Upstox
+import upstox_client
 from collections import Counter
 import random
 
