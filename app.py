@@ -1,48 +1,44 @@
 import streamlit as st
-from upstox_api.api import Upstox
 from streamlit_autorefresh import st_autorefresh
+from upstox_api.api import Upstox, Session
+from collections import Counter
 
-# 🔐 INSERT YOUR CREDENTIALS HERE
-api_key = "adc99235-baf1-4b04-8c94-b1502e573924"       # ← Replace this
-api_secret = "hoxszn7cr3" # ← Replace this
+# 🔄 Auto-refresh every 60 seconds
+st_autorefresh(interval=60000, limit=100, key="dashboard_refresh")
+
+st.title("📊 Market Signal Dashboard")
+
+# 🔐 Load secrets
+api_key = "adc99235-baf1-4b04-8c94-b1502e573924"      
+api_secret = "hoxszn7cr3"
 redirect_uri = "http://localhost:8000"
 
-# 🔄 Refresh every 60 seconds
-st_autorefresh(interval=60000, limit=100, key="refresh")
+# 🧠 Dummy strategy logic (replace with real signal logic)
+def get_strategy_signal(strategy_name):
+    import random
+    return random.choice(["Buy CE", "Buy PE", "Sideways"])
 
-# 🔗 Authenticate
-u = Upstox(api_key, api_secret, redirect_uri)
+# 🧮 Aggregate final market view
+def aggregate_signals(signals):
+    count = Counter(signals)
+    most_common = count.most_common(1)[0][0]
+    return most_common
 
-# Step 1: Get login URL
-if 'access_token' not in st.session_state:
-    login_url = u.get_login_url()
-    st.markdown(f"🔐 [Click here to login to Upstox]({login_url})")
+# 📈 Strategy-wise signals
+strategies = ["EMA Crossover", "RSI Divergence", "MACD Momentum", "Option Chain Bias"]
+signals = {}
 
-    # Paste the code from redirect URL after login
-    code = st.text_input("Paste the code from URL after login:")
-    if code:
-        u.get_access_token(code)
-        st.session_state['access_token'] = u.get_access_token()
-        st.success("✅ Access token received!")
-else:
-    u.set_access_token(st.session_state['access_token'])
+for strat in strategies:
+    signal = get_strategy_signal(strat)
+    signals[strat] = signal
 
-    # 📈 Fetch Live Price
-    try:
-        live_data = u.get_live_feed('NSE_INDEX|Nifty 50', u.LiveFeedType.LTP)
-        ltp = live_data['ltp']
-        st.title("📊 Live Market Dashboard")
-        st.markdown(f"### 🔴 Live NIFTY Price: `{ltp}`")
+# 🧠 Final market view
+final_view = aggregate_signals(list(signals.values()))
 
-        # 🧠 Simple Signal Logic
-        if ltp > 20000:
-            signal = "BUY PE"
-        elif ltp < 19500:
-            signal = "BUY CE"
-        else:
-            signal = "SIDEWAYS"
+# 📋 Display
+st.subheader("🔍 Strategy Signals")
+for strat, signal in signals.items():
+    st.metric(label=strat, value=signal)
 
-        st.markdown(f"### 📌 Signal: **{signal}**")
-
-    except Exception as e:
-        st.error(f"Error fetching live data: {e}")
+st.subheader("🧠 Final Market View")
+st.success(final_view)
