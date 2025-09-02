@@ -11,10 +11,10 @@ st_autorefresh(interval=60000, limit=100, key="dashboard_refresh")
 
 st.title("📊 Market Signal Dashboard")
 
-# 🔐 Load secrets
-API_KEY = st.secrets["UPSTOX_API_KEY"]
-API_SECRET = st.secrets["UPSTOX_API_SECRET"]
-REDIRECT_URI = st.secrets["UPSTOX_REDIRECT_URI"]
+# 🔐 API credentials (hardcoded for now — use secrets.toml in production)
+API_KEY = "adc99325-baf1-4b04-8c94-b1502e573924"
+API_SECRET = "hoxszn7cr3"
+REDIRECT_URI = "http://localhost:8000"
 
 # ⚙️ Configure Upstox SDK
 configuration = upstox_client.Configuration()
@@ -42,7 +42,7 @@ if "access_token" not in st.session_state:
 else:
     configuration.access_token = st.session_state["access_token"]
 
-# 🧠 Dummy strategy logic (replace with real signals later)
+# 🧠 Dummy strategy logic
 def get_strategy_signal(strategy_name):
     return random.choice(["Buy CE", "Buy PE", "Sideways"])
 
