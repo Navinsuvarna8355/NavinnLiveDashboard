@@ -3,8 +3,8 @@ from upstox_api.api import Upstox
 from streamlit_autorefresh import st_autorefresh
 
 # 🔐 INSERT YOUR CREDENTIALS HERE
-api_key = "YOUR_API_KEY"       # ← Replace this
-api_secret = "YOUR_API_SECRET" # ← Replace this
+api_key = "adc99235-baf1-4b04-8c94-b1502e573924"       # ← Replace this
+api_secret = "hoxszn7cr3" # ← Replace this
 redirect_uri = "http://localhost:8000"
 
 # 🔄 Refresh every 60 seconds
