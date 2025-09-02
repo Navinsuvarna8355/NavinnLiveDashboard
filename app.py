@@ -1,73 +1,74 @@
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
 import requests
-from collections import Counter
-import random
+import urllib.parse
 
-# 🔄 Auto-refresh every 60 seconds
-st_autorefresh(interval=60000, limit=100, key="dashboard_refresh")
+# Load credentials from secrets
+API_KEY = st.secrets["UPSTOX_API_KEY"]
+API_SECRET = st.secrets["UPSTOX_API_SECRET"]
+REDIRECT_URI = st.secrets["UPSTOX_REDIRECT_URI"]
 
-st.title("📊 Market Signal Dashboard")
-
-# 🔐 API credentials
-API_KEY = "adc99325-baf1-4b04-8c94-b1502e573924"
-API_SECRET = "hoxszn7cr3"
-REDIRECT_URI = "https://navinn.streamlit.app"
-
-# 🔗 Login flow
+# Session state
 if "access_token" not in st.session_state:
-    login_url = f"https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id={API_KEY}&redirect_uri={REDIRECT_URI}"
-    st.markdown(f"[🔐 Login to Upstox]({login_url})")
+    st.session_state.access_token = None
 
-    code = st.text_input("Paste the code from Upstox redirect URL here:")
-    if code:
-        try:
-            token_url = "https://api.upstox.com/v2/login/authorization/token"
-            payload = {
-                "code": code,
-                "client_id": API_KEY,
-                "client_secret": API_SECRET,
-                "redirect_uri": REDIRECT_URI,
-                "grant_type": "authorization_code"
-            }
-            response = requests.post(token_url, data=payload)
-            token_data = response.json()
+# Step 1: Generate login URL
+def get_login_url():
+    base_url = "https://api.upstox.com/v2/login/authorization/dialog"
+    params = {
+        "response_type": "code",
+        "client_id": API_KEY,
+        "redirect_uri": REDIRECT_URI,
+    }
+    return f"{base_url}?{urllib.parse.urlencode(params)}"
 
-            if "access_token" in token_data:
-                st.session_state["access_token"] = token_data["access_token"]
-                st.success("✅ Logged in successfully!")
-            else:
-                st.error(f"Login failed: {token_data.get('error_description', 'Unknown error')}")
-        except Exception as e:
-            st.error(f"Login failed: {e}")
-    st.stop()
+# Step 2: Exchange code for access token
+def get_access_token(auth_code):
+    url = "https://api.upstox.com/v2/login/authorization/token"
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    data = {
+        "code": auth_code,
+        "client_id": API_KEY,
+        "client_secret": API_SECRET,
+        "redirect_uri": REDIRECT_URI,
+        "grant_type": "authorization_code",
+    }
+    response = requests.post(url, headers=headers, data=data)
+    if response.status_code == 200:
+        return response.json()["access_token"]
+    else:
+        st.error("❌ Failed to get access token")
+        return None
 
-# 🧠 Dummy strategy logic
-def get_strategy_signal(strategy_name):
-    return random.choice(["Buy CE", "Buy PE", "Sideways"])
+# Step 3: Fetch user profile
+def get_user_profile(token):
+    url = "https://api.upstox.com/v2/user/profile"
+    headers = {"Authorization": f"Bearer {token}"}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()["data"]
+    else:
+        st.error("❌ Failed to fetch profile")
+        return None
 
-# 🧮 Aggregate final market view
-def aggregate_signals(signals):
-    count = Counter(signals)
-    most_common = count.most_common(1)[0][0]
-    return most_common
+# UI
+st.title("📊 Upstox OAuth Login")
 
-# 📈 Strategy-wise signals
-strategies = ["EMA Crossover", "RSI Divergence", "MACD Momentum", "Option Chain Bias"]
-signals = {strat: get_strategy_signal(strat) for strat in strategies}
-
-# 🧠 Final market view
-final_view = aggregate_signals(list(signals.values()))
-
-# 📋 Display
-st.subheader("🔍 Strategy Signals")
-for strat, signal in signals.items():
-    st.metric(label=strat, value=signal)
-
-st.subheader("🧠 Final Market View")
-if final_view == "Buy CE":
-    st.success("📈 Bullish")
-elif final_view == "Buy PE":
-    st.error("📉 Bearish")
+if st.session_state.access_token:
+    st.success("✅ Logged in successfully!")
+    profile = get_user_profile(st.session_state.access_token)
+    if profile:
+        st.subheader("👤 User Profile")
+        st.json(profile)
 else:
-    st.warning("🔄 Sideways")
+    query_params = st.experimental_get_query_params()
+    if "code" in query_params:
+        auth_code = query_params["code"][0]
+        with st.spinner("🔄 Authenticating..."):
+            token = get_access_token(auth_code)
+            if token:
+                st.session_state.access_token = token
+                st.experimental_rerun()
+    else:
+        login_url = get_login_url()
+        st.markdown(f"[🔐 Click here to login with Upstox]({login_url})")
+
