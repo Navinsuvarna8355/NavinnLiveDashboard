@@ -12,7 +12,7 @@ st_autorefresh(interval=60000, limit=100, key="dashboard_refresh")
 st.title("📊 Market Signal Dashboard")
 
 # 🔐 Load secrets
-API_KEY = st.secrets["UPSTOX_API_KEY"]
+API_KEY = st.secrets["adc99235-baf1-4b04-8c94-b1502e573924"]
 API_SECRET = st.secrets["UPSTOX_API_SECRET"]
 REDIRECT_URI = st.secrets["UPSTOX_REDIRECT_URI"]
 
