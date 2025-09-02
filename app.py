@@ -1,45 +1,70 @@
 import streamlit as st
 
-def metric_badge(label, value, color):
-    st.markdown(
-        f"""
-        <div style="display:inline-block; padding:6px 12px; border-radius:8px; background-color:{color}; color:white; font-weight:bold; margin:2px;">
-            {label}: {value}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+# =========================
+# 1️⃣ CONFIG & SYMBOLS
+# =========================
+st.set_page_config(page_title="Market Dashboard", layout="wide")
 
-st.set_page_config(page_title="Live NSE Dashboard", layout="wide")
-st.title("📊 Live NSE EMA, PCR, Spot, ATM, Support & Resistance")
+symbols = [
+    {"name": "NIFTY", "oc_symbol": "NIFTY", "nse_symbol": "NIFTY 50"},
+    {"name": "BANKNIFTY", "oc_symbol": "BANKNIFTY", "nse_symbol": "NIFTY BANK"},
+    {"name": "SENSEX", "oc_symbol": None, "nse_symbol": "S&P BSE SENSEX"}
+]
+
+# =========================
+# 2️⃣ DATA FUNCTIONS
+# =========================
+def get_ema_trend(symbol_name: str):
+    """
+    Replace this with your EMA calculation logic.
+    Should return a string like 'Bullish', 'Bearish', or 'Sideways'.
+    """
+    # Example placeholder:
+    return "Bullish"
+
+def get_pcr_atm_sr(symbol: str):
+    """
+    Replace this with your PCR + ATM Strike + Support/Resistance logic.
+    Should return: (pcr_value, spot_price, atm_strike, support, resistance)
+    """
+    # Example placeholder:
+    return 1.2, 19850, 19850, 19700, 20000
+
+def interpret_pcr(pcr_value: float):
+    """
+    Interpret PCR value into a trend signal.
+    """
+    if pcr_value > 1.3:
+        return "Bullish"
+    elif pcr_value < 0.7:
+        return "Bearish"
+    else:
+        return "Sideways"
+
+# =========================
+# 3️⃣ UI LAYOUT
+# =========================
+st.title("📊 Market Strategy Dashboard")
 
 for sym in symbols:
-    ema_trend = get_ema_trend(sym['nse_symbol'])
-    pcr_value, spot_price, atm_strike, support, resistance = get_pcr_atm_sr(sym['oc_symbol'])
-    pcr_trend = interpret_pcr(pcr_value) if pcr_value is not None else None
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.subheader(sym['name'])
 
-    with st.container():
-        st.markdown(f"### {sym['name']}")
-        col1, col2 = st.columns([1,4])
-        
-        with col1:
-            # Trend badges
-            if ema_trend:
-                metric_badge("EMA", ema_trend, "#28a745" if ema_trend=="Bullish" else "#dc3545" if ema_trend=="Bearish" else "#ffc107")
-            if pcr_trend:
-                metric_badge("PCR", pcr_trend, "#28a745" if pcr_trend=="Bullish" else "#dc3545" if pcr_trend=="Bearish" else "#ffc107")
-        
-        with col2:
-            # Numeric metrics
-            st.markdown(
-                f"""
-                <div style="display:flex; gap:20px; font-size:16px;">
-                    <div>📈 PCR Value: <b>{pcr_value:.2f if pcr_value else '--'}</b></div>
-                    <div>💹 Spot: <b>{spot_price if spot_price else '--'}</b></div>
-                    <div>🎯 ATM: <b>{atm_strike if atm_strike else '--'}</b></div>
-                    <div>🛡 Support: <b>{support if support else '--'}</b></div>
-                    <div>🚀 Resistance: <b>{resistance if resistance else '--'}</b></div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+    with col2:
+        # Fetch EMA trend
+        ema_trend = get_ema_trend(sym['nse_symbol'])
+
+        # Fetch PCR + ATM + SR
+        pcr_value, spot_price, atm_strike, support, resistance = get_pcr_atm_sr(sym['oc_symbol'])
+        pcr_trend = interpret_pcr(pcr_value)
+
+        # Display metrics
+        st.markdown(f"**EMA Trend:** {ema_trend}")
+        st.markdown(f"**PCR Value:** {pcr_value} → {pcr_trend}")
+        st.markdown(f"**Spot Price:** {spot_price}")
+        st.markdown(f"**ATM Strike:** {atm_strike}")
+        st.markdown(f"**Support:** {support}")
+        st.markdown(f"**Resistance:** {resistance}")
+
+    st.markdown("---")
