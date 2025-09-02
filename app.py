@@ -4,9 +4,6 @@ import pandas as pd
 import talib
 import streamlit as st
 
-# --------------------
-# Config
-# --------------------
 headers = {
     "User-Agent": "Mozilla/5.0",
     "Accept-Language": "en-US,en;q=0.9",
@@ -15,34 +12,25 @@ headers = {
 symbols = [
     {"name": "NIFTY", "oc_symbol": "NIFTY", "nse_symbol": "NIFTY 50"},
     {"name": "BANKNIFTY", "oc_symbol": "BANKNIFTY", "nse_symbol": "NIFTY BANK"},
-    {"name": "SENSEX", "oc_symbol": None, "nse_symbol": "S&P BSE SENSEX"}  # No NSE option chain
+    {"name": "SENSEX", "oc_symbol": None, "nse_symbol": "S&P BSE SENSEX"}
 ]
 
-# --------------------
-# Fetch OHLC from NSE
-# --------------------
 def get_nse_ohlc(symbol_name):
     session = requests.Session()
     session.get("https://www.nseindia.com", headers=headers)
     chart_url = f"https://www.nseindia.com/api/chart-databyindex?index={symbol_name.replace(' ', '%20')}&indices=true"
     rc = session.get(chart_url, headers=headers)
-
     try:
         chart_data = rc.json()
     except json.JSONDecodeError:
         return pd.DataFrame()
-
     candles = chart_data.get('grapthData', [])
     if not candles:
         return pd.DataFrame()
-
     df = pd.DataFrame(candles, columns=["timestamp", "close"])
     df['close'] = df['close'].astype(float)
     return df
 
-# --------------------
-# EMA Trend
-# --------------------
 def get_ema_trend(symbol_name):
     df = get_nse_ohlc(symbol_name)
     if df.empty:
@@ -58,29 +46,9 @@ def get_ema_trend(symbol_name):
     else:
         return "Sideways"
 
-# --------------------
-# Spot Price from NSE
-# --------------------
-def get_spot_price(symbol_name):
-    session = requests.Session()
-    session.get("https://www.nseindia.com", headers=headers)
-    url = f"https://www.nseindia.com/api/equity-stockIndices?index={symbol_name.replace(' ', '%20')}"
-    r = session.get(url, headers=headers)
-    try:
-        data = r.json()
-    except json.JSONDecodeError:
-        return None
-    for item in data.get("data", []):
-        if item.get("indexName") == symbol_name:
-            return item.get("last")
-    return None
-
-# --------------------
-# PCR + ATM Strike from NSE Option Chain
-# --------------------
-def get_pcr_and_atm(symbol):
+def get_pcr_atm_sr(symbol):
     if not symbol:
-        return None, None
+        return None, None, None, None, None
     session = requests.Session()
     session.get("https://www.nseindia.com/option-chain", headers=headers)
     url = f"https://www.nseindia.com/api/option-chain-indices?symbol={symbol}"
@@ -88,31 +56,40 @@ def get_pcr_and_atm(symbol):
     try:
         data = json.loads(response.text)
     except json.JSONDecodeError:
-        return None, None
+        return None, None, None, None, None
 
     spot_price = data.get("records", {}).get("underlyingValue", None)
-
     expiry_dates = data.get("records", {}).get("expiryDates", [])
     if not expiry_dates:
-        return None, spot_price
+        return None, spot_price, None, None, None
     current_expiry = expiry_dates[0]
 
     total_ce_oi = total_pe_oi = 0
     strikes = []
+    ce_oi_map = {}
+    pe_oi_map = {}
+
     for item in data['records']['data']:
         if item["expiryDate"] == current_expiry:
             strike = item.get("strikePrice")
             strikes.append(strike)
-            total_ce_oi += item.get("CE", {}).get("openInterest", 0)
-            total_pe_oi += item.get("PE", {}).get("openInterest", 0)
+            ce_oi = item.get("CE", {}).get("openInterest", 0)
+            pe_oi = item.get("PE", {}).get("openInterest", 0)
+            total_ce_oi += ce_oi
+            total_pe_oi += pe_oi
+            ce_oi_map[strike] = ce_oi
+            pe_oi_map[strike] = pe_oi
 
     pcr = total_pe_oi / total_ce_oi if total_ce_oi else None
     atm_strike = min(strikes, key=lambda x: abs(x - spot_price)) if spot_price and strikes else None
-    return pcr, atm_strike
 
-# --------------------
-# PCR Interpretation
-# --------------------
+    # Resistance = CE OI max
+    resistance = max(ce_oi_map, key=ce_oi_map.get) if ce_oi_map else None
+    # Support = PE OI max
+    support = max(pe_oi_map, key=pe_oi_map.get) if pe_oi_map else None
+
+    return pcr, spot_price, atm_strike, support, resistance
+
 def interpret_pcr(pcr):
     if pcr is None:
         return None
@@ -123,9 +100,6 @@ def interpret_pcr(pcr):
     else:
         return "Sideways"
 
-# --------------------
-# Color for Trend
-# --------------------
 def color_for_trend(trend):
     if trend == "Bullish":
         return "🟢"
@@ -134,19 +108,15 @@ def color_for_trend(trend):
     else:
         return "🟡"
 
-# --------------------
-# Streamlit UI
-# --------------------
-st.set_page_config(page_title="Live NSE EMA & PCR Dashboard", layout="wide")
-st.title("📊 Live NSE EMA, PCR, Spot & ATM Dashboard")
+st.set_page_config(page_title="Live NSE EMA, PCR, Spot, ATM, S/R Dashboard", layout="wide")
+st.title("📊 Live NSE EMA, PCR, Spot, ATM, Support & Resistance Dashboard")
 
 for sym in symbols:
     ema_trend = get_ema_trend(sym['nse_symbol'])
-    spot_price = get_spot_price(sym['nse_symbol'])
-    pcr_value, atm_strike = get_pcr_and_atm(sym['oc_symbol'])
+    pcr_value, spot_price, atm_strike, support, resistance = get_pcr_atm_sr(sym['oc_symbol'])
     pcr_trend = interpret_pcr(pcr_value) if pcr_value is not None else None
     
-    col1, col2, col3, col4, col5, col6 = st.columns([1,1,1,1,1,1])
+    col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([1,1,1,1,1,1,1,1])
     with col1:
         st.subheader(sym['name'])
     with col2:
@@ -174,5 +144,15 @@ for sym in symbols:
             st.metric("ATM Strike", f"{atm_strike}")
         else:
             st.write("—")
+    with col7:
+        if support:
+            st.metric("Support", f"{support}")
+        else:
+            st.write("—")
+    with col8:
+        if resistance:
+            st.metric("Resistance", f"{resistance}")
+        else:
+            st.write("—")
 
-st.caption("🔄 Market closed hone par EMA/PCR/Spot/ATM unavailable ho sakta hai. Market hours me refresh karke dekhein.")
+st.caption("🔄 Market closed hone par EMA/PCR/Spot/ATM/SR unavailable ho sakta hai. Market hours me refresh karke dekhein.")
