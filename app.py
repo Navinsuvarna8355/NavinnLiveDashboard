@@ -6,6 +6,7 @@ import time
 
 # Helper function to calculate EMA
 def calculate_ema(prices, period):
+    """Calculates the Exponential Moving Average (EMA) for a given set of prices."""
     if not prices or len(prices) < period:
         return None
     k = 2 / (period + 1)
@@ -21,14 +22,27 @@ indices_data = {
     'FINNIFTY': {'base_price': 21500, 'volatility': 30},
 }
 
+# --- UI Layout ---
+
+# Page Configuration
+st.set_page_config(layout="wide")
+
 # App Title and Description
 st.title('NSE Trading Dashboard')
-st.markdown('<p class="text-center text-sm sm:text-base text-gray-400 mb-6"> <span style="font-weight:bold; color:red;">Warning:</span> This app is for educational purposes only. The data is simulated and should not be used for real trading decisions.</p>', unsafe_allow_html=True)
+st.markdown("""
+    <div style='text-align: center; color: #888;'>
+        <p>
+            <span style='font-weight:bold; color:#f87171;'>Warning:</span> This app is for educational purposes only. The data is simulated and should not be used for real trading decisions.
+        </p>
+    </div>
+""", unsafe_allow_html=True)
 
 # Index Selection
+st.header("Index Selection")
 selected_index_name = st.selectbox(
     'Select Index:',
-    list(indices_data.keys())
+    list(indices_data.keys()),
+    key='index_selector'
 )
 
 # Initialize session state for data history
@@ -40,11 +54,13 @@ if 'history' not in st.session_state:
     }
 
 # Display a container for live data
-live_data_container = st.empty()
+live_data_placeholder = st.empty()
 
 # The main loop to simulate live data updates
 while True:
-    with live_data_container.container():
+    with live_data_placeholder.container():
+        st.subheader(f"Live Data for {selected_index_name}")
+        
         # Get data for the selected index
         current_index = indices_data[selected_index_name]
         history = st.session_state.history[selected_index_name]
@@ -54,10 +70,9 @@ while True:
         
         # Update history and keep it at a reasonable length
         history.append(new_spot_price)
-        history = history[-50:]
-        st.session_state.history[selected_index_name] = history
+        st.session_state.history[selected_index_name] = history[-50:]
 
-        latest_prices = history
+        latest_prices = st.session_state.history[selected_index_name]
         
         # Calculate indicators
         lowest_ema = calculate_ema(latest_prices, 3)
@@ -90,42 +105,42 @@ while True:
         # Calculate Strike Price (simulated)
         strike_price = round(new_spot_price / 50) * 50
 
-        # Display metrics
-        st.metric("Spot Price", f"₹{new_spot_price:.2f}")
-        st.metric("Strike Price", f"₹{strike_price:.2f}")
-
-        # Display signals with colors
-        st.subheader("Trading Signals")
+        # --- Display metrics and signals ---
+        st.divider()
+        col1, col2 = st.columns(2)
         
-        def display_signal(label, signal, color):
-            st.markdown(
-                f"""
-                <div style="background-color:{color}; padding:1rem; border-radius:0.5rem; text-align:center; margin-bottom:1rem;">
-                    <h3 style="margin:0; font-size:1.25rem;">{label}</h3>
-                    <p style="margin:0; font-weight:bold; font-size:1.5rem;">{signal}</p>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+        with col1:
+            st.metric("Spot Price", f"₹{new_spot_price:.2f}")
+        
+        with col2:
+            st.metric("Strike Price", f"₹{strike_price:.2f}")
 
-        if ema_signal == 'Buy (CE)':
-            display_signal('EMA Signal', ema_signal, '#16a34a')
-        elif ema_signal == 'Sell (PE)':
-            display_signal('EMA Signal', ema_signal, '#dc2626')
-        else:
-            display_signal('EMA Signal', ema_signal, '#d97706')
+        st.subheader("Trading Signals")
+        col_ema, col_pcr, col_rsi = st.columns(3)
+        
+        def get_signal_color_and_icon(signal):
+            if 'Buy' in signal or 'Bullish' in signal:
+                return "green", "▲"
+            elif 'Sell' in signal or 'Bearish' in signal:
+                return "red", "▼"
+            else:
+                return "orange", "▬"
+        
+        ema_color, ema_icon = get_signal_color_and_icon(ema_signal)
+        pcr_color, pcr_icon = get_signal_color_and_icon(pcr_signal)
+        rsi_color, rsi_icon = get_signal_color_and_icon(rsi_signal)
 
-        if pcr_signal == 'Bullish':
-            display_signal('PCR Signal', pcr_signal, '#16a34a')
-        elif pcr_signal == 'Bearish':
-            display_signal('PCR Signal', pcr_signal, '#dc2626')
-        else:
-            display_signal('PCR Signal', pcr_signal, '#d97706')
-
-        if rsi_signal == 'Overbought' or rsi_signal == 'Oversold':
-            display_signal('RSI Signal', rsi_signal, '#d97706')
-        else:
-            display_signal('RSI Signal', rsi_signal, '#16a34a' if rsi_signal == 'Bullish' else '#dc2626' if rsi_signal == 'Bearish' else '#d97706')
+        with col_ema:
+            st.markdown(f"### EMA Signal")
+            st.markdown(f"<p style='color:{ema_color}; font-size: 24px; font-weight: bold;'>{ema_icon} {ema_signal}</p>", unsafe_allow_html=True)
+            
+        with col_pcr:
+            st.markdown(f"### PCR Signal")
+            st.markdown(f"<p style='color:{pcr_color}; font-size: 24px; font-weight: bold;'>{pcr_icon} {pcr_signal}</p>", unsafe_allow_html=True)
+            
+        with col_rsi:
+            st.markdown(f"### RSI Signal")
+            st.markdown(f"<p style='color:{rsi_color}; font-size: 24px; font-weight: bold;'>{rsi_icon} {rsi_signal}</p>", unsafe_allow_html=True)
 
     # Wait for a few seconds before the next update
     time.sleep(2)
