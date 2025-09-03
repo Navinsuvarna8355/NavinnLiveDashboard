@@ -60,7 +60,7 @@ indices_data = {
 # --- UI Layout ---
 
 # Page Configuration
-st.set_page_config(layout="centered")
+st.set_page_config(layout="wide")
 
 # App Title and Description
 st.title('NSE Trading Dashboard')
