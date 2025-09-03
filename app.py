@@ -98,7 +98,7 @@ def display_index_dashboard(column, index_name, live_data, history):
     with column:
         # Use a container for a clean, bordered section
         with st.container(border=True):
-            st.markdown(f"<h3 style='text-align: center; color: #6C757D;'>{index_name}</h3>", unsafe_allow_html=True)
+            st.markdown(f"<h3 style='text-align: center; color: #6C757D; font-size: 24px;'>{index_name}</h3>", unsafe_allow_html=True)
             st.markdown("---")
             
             # Use columns for metrics
