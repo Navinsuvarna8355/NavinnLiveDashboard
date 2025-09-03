@@ -59,8 +59,6 @@ live_data_placeholder = st.empty()
 # The main loop to simulate live data updates
 while True:
     with live_data_placeholder.container():
-        st.subheader(f"Live Data for {selected_index_name}")
-        
         # Get data for the selected index
         current_index = indices_data[selected_index_name]
         history = st.session_state.history[selected_index_name]
@@ -105,42 +103,44 @@ while True:
         # Calculate Strike Price (simulated)
         strike_price = round(new_spot_price / 50) * 50
 
-        # --- Display metrics and signals ---
-        st.divider()
-        col1, col2 = st.columns(2)
+        # --- Main Layout with Two Columns ---
+        col_main_1, col_main_2 = st.columns(2)
         
-        with col1:
+        with col_main_1:
+            st.subheader(f"Metrics for {selected_index_name}")
+            st.divider()
             st.metric("Spot Price", f"₹{new_spot_price:.2f}")
-        
-        with col2:
             st.metric("Strike Price", f"₹{strike_price:.2f}")
-
-        st.subheader("Trading Signals")
-        col_ema, col_pcr, col_rsi = st.columns(3)
-        
-        def get_signal_color_and_icon(signal):
-            if 'Buy' in signal or 'Bullish' in signal:
-                return "green", "▲"
-            elif 'Sell' in signal or 'Bearish' in signal:
-                return "red", "▼"
-            else:
-                return "orange", "▬"
-        
-        ema_color, ema_icon = get_signal_color_and_icon(ema_signal)
-        pcr_color, pcr_icon = get_signal_color_and_icon(pcr_signal)
-        rsi_color, rsi_icon = get_signal_color_and_icon(rsi_signal)
-
-        with col_ema:
-            st.markdown(f"### EMA Signal")
-            st.markdown(f"<p style='color:{ema_color}; font-size: 24px; font-weight: bold;'>{ema_icon} {ema_signal}</p>", unsafe_allow_html=True)
             
-        with col_pcr:
-            st.markdown(f"### PCR Signal")
-            st.markdown(f"<p style='color:{pcr_color}; font-size: 24px; font-weight: bold;'>{pcr_icon} {pcr_signal}</p>", unsafe_allow_html=True)
+        with col_main_2:
+            st.subheader("Trading Signals")
+            st.divider()
             
-        with col_rsi:
-            st.markdown(f"### RSI Signal")
-            st.markdown(f"<p style='color:{rsi_color}; font-size: 24px; font-weight: bold;'>{rsi_icon} {rsi_signal}</p>", unsafe_allow_html=True)
+            col_ema, col_pcr, col_rsi = st.columns(3)
+            
+            def get_signal_color_and_icon(signal):
+                if 'Buy' in signal or 'Bullish' in signal:
+                    return "green", "▲"
+                elif 'Sell' in signal or 'Bearish' in signal:
+                    return "red", "▼"
+                else:
+                    return "orange", "▬"
+            
+            ema_color, ema_icon = get_signal_color_and_icon(ema_signal)
+            pcr_color, pcr_icon = get_signal_color_and_icon(pcr_signal)
+            rsi_color, rsi_icon = get_signal_color_and_icon(rsi_signal)
+
+            with col_ema:
+                st.markdown(f"### EMA")
+                st.markdown(f"<p style='color:{ema_color}; font-size: 24px; font-weight: bold;'>{ema_icon} {ema_signal}</p>", unsafe_allow_html=True)
+                
+            with col_pcr:
+                st.markdown(f"### PCR")
+                st.markdown(f"<p style='color:{pcr_color}; font-size: 24px; font-weight: bold;'>{pcr_icon} {pcr_signal}</p>", unsafe_allow_html=True)
+                
+            with col_rsi:
+                st.markdown(f"### RSI")
+                st.markdown(f"<p style='color:{rsi_color}; font-size: 24px; font-weight: bold;'>{rsi_icon} {rsi_signal}</p>", unsafe_allow_html=True)
 
     # Wait for a few seconds before the next update
     time.sleep(2)
