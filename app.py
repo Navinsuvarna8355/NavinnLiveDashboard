@@ -75,108 +75,103 @@ if 'history' not in st.session_state:
         'FINNIFTY': [indices_data['FINNIFTY']['base_price']],
     }
 
+# Update data for all indices
+live_data_nifty = fetch_live_data('NIFTY 50')
+live_data_banknifty = fetch_live_data('BANKNIFTY')
+live_data_finnifty = fetch_live_data('FINNIFTY')
+
+# Update history for all indices
+st.session_state.history['NIFTY 50'].append(live_data_nifty.get('spot_price', st.session_state.history['NIFTY 50'][-1]))
+st.session_state.history['NIFTY 50'] = st.session_state.history['NIFTY 50'][-50:]
+
+st.session_state.history['BANKNIFTY'].append(live_data_banknifty.get('spot_price', st.session_state.history['BANKNIFTY'][-1]))
+st.session_state.history['BANKNIFTY'] = st.session_state.history['BANKNIFTY'][-50:]
+
+st.session_state.history['FINNIFTY'].append(live_data_finnifty.get('spot_price', st.session_state.history['FINNIFTY'][-1]))
+st.session_state.history['FINNIFTY'] = st.session_state.history['FINNIFTY'][-50:]
+    
 # Create three columns for the indices
 col1, col2, col3 = st.columns(3)
 
-# The main loop to simulate live data updates
-while True:
-    # Update data for all indices in each loop
-    live_data_nifty = fetch_live_data('NIFTY 50')
-    live_data_banknifty = fetch_live_data('BANKNIFTY')
-    live_data_finnifty = fetch_live_data('FINNIFTY')
+# --- Function to display a single index dashboard ---
+def display_index_dashboard(column, index_name, live_data, history):
+    with column:
+        # Use a container for a clean, bordered section
+        with st.container(border=True):
+            st.markdown(f"<h3 style='text-align: center; color: #6C757D;'>{index_name}</h3>", unsafe_allow_html=True)
+            st.markdown("---")
+            
+            # Use columns for metrics
+            metric_col1, metric_col2 = st.columns(2)
+            
+            spot_price = live_data.get('spot_price')
+            strike_price = round(spot_price / 50) * 50
+            
+            with metric_col1:
+                st.metric("Spot Price", f"₹{spot_price:.2f}")
+            with metric_col2:
+                st.metric("Strike Price", f"₹{strike_price:.2f}")
+            
+            st.markdown("---")
 
-    # Update history for all indices
-    st.session_state.history['NIFTY 50'].append(live_data_nifty.get('spot_price', st.session_state.history['NIFTY 50'][-1]))
-    st.session_state.history['NIFTY 50'] = st.session_state.history['NIFTY 50'][-50:]
+            # Trading Signals section
+            st.markdown("#### Trading Signals")
+            
+            # Calculate indicators
+            lowest_ema = calculate_ema(history, 3)
+            medium_ema = calculate_ema(history, 13)
+            longest_ema = calculate_ema(history, 9)
 
-    st.session_state.history['BANKNIFTY'].append(live_data_banknifty.get('spot_price', st.session_state.history['BANKNIFTY'][-1]))
-    st.session_state.history['BANKNIFTY'] = st.session_state.history['BANKNIFTY'][-50:]
+            # EMA Crossover Signal Logic
+            ema_signal = 'Sideways'
+            if lowest_ema and medium_ema and longest_ema:
+                if lowest_ema > medium_ema and lowest_ema > longest_ema:
+                    ema_signal = 'Buy (CE)'
+                elif lowest_ema < medium_ema and lowest_ema < longest_ema:
+                    ema_signal = 'Sell (PE)'
 
-    st.session_state.history['FINNIFTY'].append(live_data_finnifty.get('spot_price', st.session_state.history['FINNIFTY'][-1]))
-    st.session_state.history['FINNIFTY'] = st.session_state.history['FINNIFTY'][-50:]
-    
-    # --- Function to display a single index dashboard ---
-    def display_index_dashboard(column, index_name, live_data, history):
-        with column:
-            # Use a container for a clean, bordered section
-            with st.container(border=True):
-                st.markdown(f"<h3 style='text-align: center; color: #6C757D;'>{index_name}</h3>", unsafe_allow_html=True)
-                st.markdown("---")
-                
-                # Use columns for metrics
-                metric_col1, metric_col2 = st.columns(2)
-                
-                spot_price = live_data.get('spot_price')
-                strike_price = round(spot_price / 50) * 50
-                
-                with metric_col1:
-                    st.metric("Spot Price", f"₹{spot_price:.2f}")
-                with metric_col2:
-                    st.metric("Strike Price", f"₹{strike_price:.2f}")
-                
-                st.markdown("---")
+            # PCR and RSI from fetched data
+            pcr = live_data.get('pcr')
+            pcr_signal = 'Neutral'
+            if pcr > 1.1:
+                pcr_signal = 'Bullish'
+            elif pcr < 0.9:
+                pcr_signal = 'Bearish'
+            
+            rsi = live_data.get('rsi')
+            rsi_signal = 'Neutral'
+            if rsi > 70:
+                rsi_signal = 'Overbought'
+            elif rsi < 30:
+                rsi_signal = 'Oversold'
 
-                # Trading Signals section
-                st.markdown("#### Trading Signals")
-                
-                # Calculate indicators
-                lowest_ema = calculate_ema(history, 3)
-                medium_ema = calculate_ema(history, 13)
-                longest_ema = calculate_ema(history, 9)
+            # Use Streamlit's built-in components for a better UI
+            st.markdown("**EMA**")
+            if 'Buy' in ema_signal:
+                st.success(f"▲ {ema_signal}")
+            elif 'Sell' in ema_signal:
+                st.error(f"▼ {ema_signal}")
+            else:
+                st.info(f"▬ {ema_signal}")
 
-                # EMA Crossover Signal Logic
-                ema_signal = 'Sideways'
-                if lowest_ema and medium_ema and longest_ema:
-                    if lowest_ema > medium_ema and lowest_ema > longest_ema:
-                        ema_signal = 'Buy (CE)'
-                    elif lowest_ema < medium_ema and lowest_ema < longest_ema:
-                        ema_signal = 'Sell (PE)'
-
-                # PCR and RSI from fetched data
-                pcr = live_data.get('pcr')
-                pcr_signal = 'Neutral'
-                if pcr > 1.1:
-                    pcr_signal = 'Bullish'
-                elif pcr < 0.9:
-                    pcr_signal = 'Bearish'
-                
-                rsi = live_data.get('rsi')
-                rsi_signal = 'Neutral'
-                if rsi > 70:
-                    rsi_signal = 'Overbought'
-                elif rsi < 30:
-                    rsi_signal = 'Oversold'
-
-                # Use Streamlit's built-in components for a better UI
-                st.markdown("**EMA**")
-                if 'Buy' in ema_signal:
-                    st.success(f"▲ {ema_signal}")
-                elif 'Sell' in ema_signal:
-                    st.error(f"▼ {ema_signal}")
-                else:
-                    st.info(f"▬ {ema_signal}")
-
-                st.markdown("**PCR**")
-                if 'Bullish' in pcr_signal:
-                    st.success(f"▲ {pcr_signal}")
-                elif 'Bearish' in pcr_signal:
-                    st.error(f"▼ {pcr_signal}")
-                else:
-                    st.info(f"▬ {pcr_signal}")
-                
-                st.markdown("**RSI**")
-                if 'Overbought' in rsi_signal:
-                    st.warning(f"⚠ {rsi_signal}")
-                elif 'Oversold' in rsi_signal:
-                    st.warning(f"⚠ {rsi_signal}")
-                else:
-                    st.info(f"▬ {rsi_signal}")
+            st.markdown("**PCR**")
+            if 'Bullish' in pcr_signal:
+                st.success(f"▲ {pcr_signal}")
+            elif 'Bearish' in pcr_signal:
+                st.error(f"▼ {pcr_signal}")
+            else:
+                st.info(f"▬ {pcr_signal}")
+            
+            st.markdown("**RSI**")
+            if 'Overbought' in rsi_signal:
+                st.warning(f"⚠ {rsi_signal}")
+            elif 'Oversold' in rsi_signal:
+                st.warning(f"⚠ {rsi_signal}")
+            else:
+                st.info(f"▬ {rsi_signal}")
 
 
-    # Display each index in its own column
-    display_index_dashboard(col1, 'NIFTY 50', live_data_nifty, st.session_state.history['NIFTY 50'])
-    display_index_dashboard(col2, 'BANKNIFTY', live_data_banknifty, st.session_state.history['BANKNIFTY'])
-    display_index_dashboard(col3, 'FINNIFTY', live_data_finnifty, st.session_state.history['FINNIFTY'])
-
-    # Wait for a few seconds before the next update
-    time.sleep(2)
+# Display each index in its own column
+display_index_dashboard(col1, 'NIFTY 50', live_data_nifty, st.session_state.history['NIFTY 50'])
+display_index_dashboard(col2, 'BANKNIFTY', live_data_banknifty, st.session_state.history['BANKNIFTY'])
+display_index_dashboard(col3, 'FINNIFTY', live_data_finnifty, st.session_state.history['FINNIFTY'])
