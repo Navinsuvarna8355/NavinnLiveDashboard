@@ -98,63 +98,69 @@ while True:
     # --- Function to display a single index dashboard ---
     def display_index_dashboard(column, index_name, live_data, history):
         with column:
-            st.subheader(index_name)
-            st.divider()
+            # Use a container for a clean, bordered section
+            with st.container(border=True):
+                st.subheader(index_name)
+                
+                # Use columns for metrics
+                metric_col1, metric_col2 = st.columns(2)
+                
+                spot_price = live_data.get('spot_price')
+                strike_price = round(spot_price / 50) * 50
+                
+                with metric_col1:
+                    st.metric("Spot Price", f"₹{spot_price:.2f}")
+                with metric_col2:
+                    st.metric("Strike Price", f"₹{strike_price:.2f}")
+                
+                st.markdown("---")
 
-            # Calculate and display metrics
-            spot_price = live_data.get('spot_price')
-            strike_price = round(spot_price / 50) * 50
-            st.metric("Spot Price", f"₹{spot_price:.2f}")
-            st.metric("Strike Price", f"₹{strike_price:.2f}")
-            
-            st.markdown("---")
+                # Trading Signals section
+                st.markdown("#### Trading Signals")
+                
+                # Calculate indicators
+                lowest_ema = calculate_ema(history, 3)
+                medium_ema = calculate_ema(history, 13)
+                longest_ema = calculate_ema(history, 9)
 
-            # Calculate and display signals
-            st.markdown("#### Trading Signals")
-            
-            # Calculate indicators
-            lowest_ema = calculate_ema(history, 3)
-            medium_ema = calculate_ema(history, 13)
-            longest_ema = calculate_ema(history, 9)
+                # EMA Crossover Signal Logic
+                ema_signal = 'Sideways'
+                if lowest_ema and medium_ema and longest_ema:
+                    if lowest_ema > medium_ema and lowest_ema > longest_ema:
+                        ema_signal = 'Buy (CE)'
+                    elif lowest_ema < medium_ema and lowest_ema < longest_ema:
+                        ema_signal = 'Sell (PE)'
 
-            # EMA Crossover Signal Logic
-            ema_signal = 'Sideways'
-            if lowest_ema and medium_ema and longest_ema:
-                if lowest_ema > medium_ema and lowest_ema > longest_ema:
-                    ema_signal = 'Buy (CE)'
-                elif lowest_ema < medium_ema and lowest_ema < longest_ema:
-                    ema_signal = 'Sell (PE)'
+                # PCR and RSI from fetched data
+                pcr = live_data.get('pcr')
+                pcr_signal = 'Neutral'
+                if pcr > 1.1:
+                    pcr_signal = 'Bullish'
+                elif pcr < 0.9:
+                    pcr_signal = 'Bearish'
+                
+                rsi = live_data.get('rsi')
+                rsi_signal = 'Neutral'
+                if rsi > 70:
+                    rsi_signal = 'Overbought'
+                elif rsi < 30:
+                    rsi_signal = 'Oversold'
 
-            # PCR and RSI from fetched data
-            pcr = live_data.get('pcr')
-            pcr_signal = 'Neutral'
-            if pcr > 1.1:
-                pcr_signal = 'Bullish'
-            elif pcr < 0.9:
-                pcr_signal = 'Bearish'
-            
-            rsi = live_data.get('rsi')
-            rsi_signal = 'Neutral'
-            if rsi > 70:
-                rsi_signal = 'Overbought'
-            elif rsi < 30:
-                rsi_signal = 'Oversold'
+                def get_signal_color_and_icon(signal):
+                    if 'Buy' in signal or 'Bullish' in signal:
+                        return "green", "▲"
+                    elif 'Sell' in signal or 'Bearish' in signal:
+                        return "red", "▼"
+                    else:
+                        return "orange", "▬"
+                
+                ema_color, ema_icon = get_signal_color_and_icon(ema_signal)
+                pcr_color, pcr_icon = get_signal_color_and_icon(pcr_signal)
+                rsi_color, rsi_icon = get_signal_color_and_icon(rsi_signal)
 
-            def get_signal_color_and_icon(signal):
-                if 'Buy' in signal or 'Bullish' in signal:
-                    return "green", "▲"
-                elif 'Sell' in signal or 'Bearish' in signal:
-                    return "red", "▼"
-                else:
-                    return "orange", "▬"
-            
-            ema_color, ema_icon = get_signal_color_and_icon(ema_signal)
-            pcr_color, pcr_icon = get_signal_color_and_icon(pcr_signal)
-            rsi_color, rsi_icon = get_signal_color_and_icon(rsi_signal)
-
-            st.markdown(f"**EMA:** <span style='color:{ema_color}'>{ema_icon} {ema_signal}</span>", unsafe_allow_html=True)
-            st.markdown(f"**PCR:** <span style='color:{pcr_color}'>{pcr_icon} {pcr_signal}</span>", unsafe_allow_html=True)
-            st.markdown(f"**RSI:** <span style='color:{rsi_color}'>{rsi_icon} {rsi_signal}</span>", unsafe_allow_html=True)
+                st.markdown(f"**EMA:** <span style='color:{ema_color}'>{ema_icon} {ema_signal}</span>", unsafe_allow_html=True)
+                st.markdown(f"**PCR:** <span style='color:{pcr_color}'>{pcr_icon} {pcr_signal}</span>", unsafe_allow_html=True)
+                st.markdown(f"**RSI:** <span style='color:{rsi_color}'>{rsi_icon} {rsi_signal}</span>", unsafe_allow_html=True)
 
 
     # Display each index in its own column
