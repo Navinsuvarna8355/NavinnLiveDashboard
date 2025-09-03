@@ -100,7 +100,8 @@ while True:
         with column:
             # Use a container for a clean, bordered section
             with st.container(border=True):
-                st.subheader(index_name)
+                st.markdown(f"<h3 style='text-align: center; color: #6C757D;'>{index_name}</h3>", unsafe_allow_html=True)
+                st.markdown("---")
                 
                 # Use columns for metrics
                 metric_col1, metric_col2 = st.columns(2)
@@ -146,21 +147,30 @@ while True:
                 elif rsi < 30:
                     rsi_signal = 'Oversold'
 
-                def get_signal_color_and_icon(signal):
-                    if 'Buy' in signal or 'Bullish' in signal:
-                        return "green", "▲"
-                    elif 'Sell' in signal or 'Bearish' in signal:
-                        return "red", "▼"
-                    else:
-                        return "orange", "▬"
-                
-                ema_color, ema_icon = get_signal_color_and_icon(ema_signal)
-                pcr_color, pcr_icon = get_signal_color_and_icon(pcr_signal)
-                rsi_color, rsi_icon = get_signal_color_and_icon(rsi_signal)
+                # Use Streamlit's built-in components for a better UI
+                st.markdown("**EMA**")
+                if 'Buy' in ema_signal:
+                    st.success(f"▲ {ema_signal}")
+                elif 'Sell' in ema_signal:
+                    st.error(f"▼ {ema_signal}")
+                else:
+                    st.info(f"▬ {ema_signal}")
 
-                st.markdown(f"**EMA:** <span style='color:{ema_color}'>{ema_icon} {ema_signal}</span>", unsafe_allow_html=True)
-                st.markdown(f"**PCR:** <span style='color:{pcr_color}'>{pcr_icon} {pcr_signal}</span>", unsafe_allow_html=True)
-                st.markdown(f"**RSI:** <span style='color:{rsi_color}'>{rsi_icon} {rsi_signal}</span>", unsafe_allow_html=True)
+                st.markdown("**PCR**")
+                if 'Bullish' in pcr_signal:
+                    st.success(f"▲ {pcr_signal}")
+                elif 'Bearish' in pcr_signal:
+                    st.error(f"▼ {pcr_signal}")
+                else:
+                    st.info(f"▬ {pcr_signal}")
+                
+                st.markdown("**RSI**")
+                if 'Overbought' in rsi_signal:
+                    st.warning(f"⚠ {rsi_signal}")
+                elif 'Oversold' in rsi_signal:
+                    st.warning(f"⚠ {rsi_signal}")
+                else:
+                    st.info(f"▬ {rsi_signal}")
 
 
     # Display each index in its own column
