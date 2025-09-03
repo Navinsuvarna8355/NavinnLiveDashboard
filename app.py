@@ -20,21 +20,20 @@ def calculate_ema(prices, period):
 # A function to fetch real-time data from an API (Placeholder)
 def fetch_live_data(index_name):
     """
-    लाइव बाज़ार डेटा API से वास्तविक डेटा लाने का एक प्लेसहोल्डर फ़ंक्शन।
-    आपको अपनी API कुंजी और सही API endpoint के साथ इसे अपडेट करना होगा।
+    A placeholder function to fetch real-time data from a live market data API.
+    You would need to update this with your API key and the correct API endpoint.
     """
-    # यहाँ आपको अपने चुने हुए API का उपयोग करना होगा।
-    # उदाहरण के लिए, यह एक काल्पनिक API कॉल है।
+    # Here you would use your chosen API.
+    # For example, this is a hypothetical API call.
     # api_url = f"https://api.yourprovider.com/data?symbol={index_name}"
     # headers = {"Authorization": "Bearer YOUR_API_KEY"}
 
     try:
         # response = requests.get(api_url, headers=headers)
-        # response.raise_for_status()  # अगर अनुरोध असफल हो तो एक HTTPError उठाता है।
+        # response.raise_for_status()  # Raises an HTTPError if the request failed.
         # data = response.json()
 
-        # वास्तविक डेटा के बजाय, हम यहाँ नकली डेटा का उपयोग जारी रखेंगे
-        # ताकि ऐप काम करता रहे।
+        # For now, we'll continue using mock data so the app keeps working.
         mock_data = {
             'NIFTY 50': {'spot_price': 22500 + (random.random() - 0.5) * 20, 'pcr': 0.95 + (random.random() - 0.5) * 0.1, 'rsi': 55 + (random.random() - 0.5) * 10},
             'BANKNIFTY': {'spot_price': 48000 + (random.random() - 0.5) * 50, 'pcr': 0.9 + (random.random() - 0.5) * 0.1, 'rsi': 60 + (random.random() - 0.5) * 10},
@@ -43,7 +42,7 @@ def fetch_live_data(index_name):
         return mock_data.get(index_name, {})
 
     except requests.exceptions.RequestException as e:
-        st.error(f"API से डेटा लाने में त्रुटि: {e}")
+        st.error(f"Error fetching data from API: {e}")
         return {}
 
 # Mock data for different indices
@@ -63,7 +62,7 @@ st.title('NSE Trading Dashboard')
 st.markdown("""
     <div style='text-align: center; color: #888;'>
         <p>
-            <span style='font-weight:bold; color:#f87171;'>चेतावनी:</span> यह ऐप केवल शैक्षिक उद्देश्यों के लिए है। डेटा नकली है और वास्तविक व्यापारिक निर्णयों के लिए इसका उपयोग नहीं किया जाना चाहिए।
+            <span style='font-weight:bold; color:#f87171;'>Warning:</span> This app is for educational purposes only. The data is simulated and should not be used for real trading decisions.
         </p>
     </div>
 """, unsafe_allow_html=True)
@@ -105,13 +104,13 @@ while True:
             # Calculate and display metrics
             spot_price = live_data.get('spot_price')
             strike_price = round(spot_price / 50) * 50
-            st.metric("स्पॉट प्राइस", f"₹{spot_price:.2f}")
-            st.metric("स्ट्राइक प्राइस", f"₹{strike_price:.2f}")
+            st.metric("Spot Price", f"₹{spot_price:.2f}")
+            st.metric("Strike Price", f"₹{strike_price:.2f}")
             
             st.markdown("---")
 
             # Calculate and display signals
-            st.markdown("#### ट्रेडिंग सिग्नल")
+            st.markdown("#### Trading Signals")
             
             # Calculate indicators
             lowest_ema = calculate_ema(history, 3)
@@ -122,29 +121,29 @@ while True:
             ema_signal = 'Sideways'
             if lowest_ema and medium_ema and longest_ema:
                 if lowest_ema > medium_ema and lowest_ema > longest_ema:
-                    ema_signal = 'खरीदें (CE)'
+                    ema_signal = 'Buy (CE)'
                 elif lowest_ema < medium_ema and lowest_ema < longest_ema:
-                    ema_signal = 'बेचें (PE)'
+                    ema_signal = 'Sell (PE)'
 
             # PCR and RSI from fetched data
             pcr = live_data.get('pcr')
-            pcr_signal = 'तटस्थ'
+            pcr_signal = 'Neutral'
             if pcr > 1.1:
-                pcr_signal = 'बुलिश'
+                pcr_signal = 'Bullish'
             elif pcr < 0.9:
-                pcr_signal = 'बेयरिश'
+                pcr_signal = 'Bearish'
             
             rsi = live_data.get('rsi')
-            rsi_signal = 'तटस्थ'
+            rsi_signal = 'Neutral'
             if rsi > 70:
-                rsi_signal = 'ओवरबॉट'
+                rsi_signal = 'Overbought'
             elif rsi < 30:
-                rsi_signal = 'ओवरसोल्ड'
+                rsi_signal = 'Oversold'
 
             def get_signal_color_and_icon(signal):
-                if 'खरीदें' in signal or 'बुलिश' in signal:
+                if 'Buy' in signal or 'Bullish' in signal:
                     return "green", "▲"
-                elif 'बेचें' in signal or 'बेयरिश' in signal:
+                elif 'Sell' in signal or 'Bearish' in signal:
                     return "red", "▼"
                 else:
                     return "orange", "▬"
