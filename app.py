@@ -20,30 +20,35 @@ def calculate_ema(prices, period):
 # A function to fetch real-time data from an API (Placeholder)
 def fetch_live_data(index_name):
     """
-    A placeholder function to fetch real-time data from a live market data API.
-    You would need to update this with your API key and the correct API endpoint.
+    Function to fetch real-time data from a live market data API.
+    You MUST replace the mock data with a real API call to get accurate data.
     """
-    # Here you would use your chosen API.
-    # For example, this is a hypothetical API call.
-    # api_url = f"https://api.yourprovider.com/data?symbol={index_name}"
-    # headers = {"Authorization": "Bearer YOUR_API_KEY"}
+    # Replace this section with your actual API call.
+    # ---------------------------------------------------------------------
+    # Example using a hypothetical API:
+    # try:
+    #     api_url = f"https://api.yourprovider.com/live_data?symbol={index_name}&api_key=YOUR_API_KEY"
+    #     response = requests.get(api_url)
+    #     response.raise_for_status() # Raises an HTTPError for bad responses
+    #     data = response.json()
+    #     
+    #     # Return the spot price and other metrics from the API response
+    #     spot_price = data['price']
+    #     pcr_value = data['pcr']
+    #     rsi_value = data['rsi']
+    #     return {'spot_price': spot_price, 'pcr': pcr_value, 'rsi': rsi_value}
+    # except requests.exceptions.RequestException as e:
+    #     st.error(f"Error fetching data from API: {e}")
+    #     return {}
+    # ---------------------------------------------------------------------
 
-    try:
-        # response = requests.get(api_url, headers=headers)
-        # response.raise_for_status()  # Raises an HTTPError if the request failed.
-        # data = response.json()
-
-        # For now, we'll continue using mock data so the app keeps working.
-        mock_data = {
-            'NIFTY 50': {'spot_price': 22500 + (random.random() - 0.5) * 20, 'pcr': 0.95 + (random.random() - 0.5) * 0.1, 'rsi': 55 + (random.random() - 0.5) * 10},
-            'BANKNIFTY': {'spot_price': 48000 + (random.random() - 0.5) * 50, 'pcr': 0.9 + (random.random() - 0.5) * 0.1, 'rsi': 60 + (random.random() - 0.5) * 10},
-            'FINNIFTY': {'spot_price': 21500 + (random.random() - 0.5) * 30, 'pcr': 1.05 + (random.random() - 0.5) * 0.1, 'rsi': 45 + (random.random() - 0.5) * 10}
-        }
-        return mock_data.get(index_name, {})
-
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching data from API: {e}")
-        return {}
+    # --- For now, we'll continue using mock data for demonstration purposes ---
+    mock_data = {
+        'NIFTY 50': {'spot_price': 24717 + (random.random() - 0.5) * 20, 'pcr': 0.95 + (random.random() - 0.5) * 0.1, 'rsi': 55 + (random.random() - 0.5) * 10},
+        'BANKNIFTY': {'spot_price': 54068 + (random.random() - 0.5) * 50, 'pcr': 0.9 + (random.random() - 0.5) * 0.1, 'rsi': 60 + (random.random() - 0.5) * 10},
+        'FINNIFTY': {'spot_price': 21500 + (random.random() - 0.5) * 30, 'pcr': 1.05 + (random.random() - 0.5) * 0.1, 'rsi': 45 + (random.random() - 0.5) * 10}
+    }
+    return mock_data.get(index_name, {})
 
 # Mock data for different indices
 indices_data = {
@@ -55,7 +60,7 @@ indices_data = {
 # --- UI Layout ---
 
 # Page Configuration
-st.set_page_config(layout="wide")
+st.set_page_config(layout="centered")
 
 # App Title and Description
 st.title('NSE Trading Dashboard')
