@@ -1,76 +1,65 @@
 import streamlit as st
 import requests
+import pandas as pd
 
-# =========================
-# CONFIG & SYMBOLS
-# =========================
-st.set_page_config(page_title="Market Strategy Dashboard", layout="wide")
-
-symbol_map = {
-    "NIFTY": {"oc_symbol": "NIFTY", "nse_symbol": "NIFTY 50"},
-    "BANKNIFTY": {"oc_symbol": "BANKNIFTY", "nse_symbol": "NIFTY BANK"},
-    "SENSEX": {"oc_symbol": None, "nse_symbol": "S&P BSE SENSEX"}
+# -------------------------------
+# 🔧 Config
+NIFTY_URL = "https://your-api.com/nifty"
+BANKNIFTY_URL = "https://your-api.com/banknifty"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+    # "Authorization": "Bearer YOUR_API_KEY"  # Uncomment if needed
 }
 
-# Your proxy API base URL
-PROXY_URL = "https://my-nse-proxy.onrender.com"
-
-# =========================
-# DATA FUNCTIONS
-# =========================
-def get_spot_price(symbol_name: str):
+# -------------------------------
+# 🔍 Fetch Function
+def fetch_price_data(url, headers=None):
     try:
-        r = requests.get(f"{PROXY_URL}/price/{symbol_name}", timeout=5)
-        data = r.json()
-        return data.get("lastPrice")
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code != 200 or not response.text.strip():
+            return None
+        return response.json()
     except Exception as e:
-        st.error(f"Price fetch error for {symbol_name}: {e}")
+        print("Fetch error:", e)
         return None
 
-def get_ema_trend(symbol_name: str):
-    # TODO: Replace with your EMA calculation logic
-    return "Bullish"
+# -------------------------------
+# 📊 Display Strategy Block
+def display_strategy(name, data):
+    st.subheader(f"{name} Strategy")
 
-def get_pcr_atm_sr(symbol: str):
-    # TODO: Replace with your PCR + ATM Strike + Support/Resistance logic
-    return 1.24, 19850, 19850, 19700, 20000
+    if data is None:
+        st.warning("⚠️ Data unavailable. Please check source.")
+        return
 
-def interpret_pcr(pcr_value: float):
-    if pcr_value is None:
-        return "N/A"
-    if pcr_value > 1.3:
-        return "Bullish"
-    elif pcr_value < 0.7:
-        return "Bearish"
-    else:
-        return "Sideways"
+    spot = data.get("spot_price")
+    ema_trend = data.get("ema_trend")
+    pcr = data.get("pcr_value")
+    signal = data.get("signal")
+    support = data.get("support")
+    resistance = data.get("resistance")
+    atm_strike = data.get("atm_strike")
 
-# =========================
-# UI LAYOUT
-# =========================
-st.title("📊 Market Strategy Dashboard")
+    st.markdown(f"**Spot Price:** {spot if spot else 'Unavailable'}")
+    st.markdown(f"**EMA Trend:** {ema_trend}")
+    st.markdown(f"**PCR Value:** {pcr} → {signal}")
+    st.markdown(f"**ATM Strike:** {atm_strike}")
+    st.markdown(f"**Support:** {support}")
+    st.markdown(f"**Resistance:** {resistance}")
 
-for key, sym in symbol_map.items():
-    col1, col2 = st.columns([1, 3])
+# -------------------------------
+# 🚀 Main App
+def main():
+    st.title("📈 Market Strategy Dashboard")
+
+    nifty_data = fetch_price_data(NIFTY_URL, HEADERS)
+    banknifty_data = fetch_price_data(BANKNIFTY_URL, HEADERS)
+
+    col1, col2 = st.columns(2)
     with col1:
-        st.subheader(key)
-
+        display_strategy("NIFTY", nifty_data)
     with col2:
-        spot_price = get_spot_price(sym['nse_symbol'])
-        ema_trend = get_ema_trend(sym['nse_symbol'])
+        display_strategy("BANKNIFTY", banknifty_data)
 
-        if sym['oc_symbol']:
-            pcr_value, spot_from_pcr, atm_strike, support, resistance = get_pcr_atm_sr(sym['oc_symbol'])
-        else:
-            pcr_value, spot_from_pcr, atm_strike, support, resistance = None, None, None, None, None
-
-        pcr_trend = interpret_pcr(pcr_value)
-
-        st.markdown(f"**Spot Price:** {spot_price}")
-        st.markdown(f"**EMA Trend:** {ema_trend}")
-        st.markdown(f"**PCR Value:** {pcr_value if pcr_value else 'N/A'} → {pcr_trend}")
-        st.markdown(f"**ATM Strike:** {atm_strike if atm_strike else 'N/A'}")
-        st.markdown(f"**Support:** {support if support else 'N/A'}")
-        st.markdown(f"**Resistance:** {resistance if resistance else 'N/A'}")
-
-    st.markdown("---")
+if __name__ == "__main__":
+    main()
