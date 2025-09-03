@@ -174,3 +174,7 @@ def display_index_dashboard(column, index_name, live_data, history):
 display_index_dashboard(col1, 'NIFTY 50', live_data_nifty, st.session_state.history['NIFTY 50'])
 display_index_dashboard(col2, 'BANKNIFTY', live_data_banknifty, st.session_state.history['BANKNIFTY'])
 display_index_dashboard(col3, 'FINNIFTY', live_data_finnifty, st.session_state.history['FINNIFTY'])
+
+# Add a rerun at the end to keep the app live-updating.
+time.sleep(2)
+st.rerun()
