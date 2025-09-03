@@ -131,9 +131,9 @@ def display_index_dashboard(column, index_name, live_data, history):
             ema_signal = 'Sideways'
             if lowest_ema and medium_ema and longest_ema:
                 if lowest_ema > medium_ema and lowest_ema > longest_ema:
-                    ema_signal = 'Buy (CE)'
+                    ema_signal = 'Bullish'
                 elif lowest_ema < medium_ema and lowest_ema < longest_ema:
-                    ema_signal = 'Sell (PE)'
+                    ema_signal = 'Bearish'
 
             # PCR and RSI from fetched data
             pcr = live_data.get('pcr')
@@ -152,9 +152,9 @@ def display_index_dashboard(column, index_name, live_data, history):
             
             # Helper function to get the correct color for the signal boxes
             def get_signal_box_style(signal):
-                if 'Buy' in signal or 'Bullish' in signal:
+                if 'Bullish' in signal:
                     return "background-color: #d4edda; color: #155724; border-radius: 5px; padding: 10px; text-align: center; font-weight: bold;"
-                elif 'Sell' in signal or 'Bearish' in signal:
+                elif 'Bearish' in signal:
                     return "background-color: #f8d7da; color: #721c24; border-radius: 5px; padding: 10px; text-align: center; font-weight: bold;"
                 elif 'Overbought' in signal or 'Oversold' in signal:
                     return "background-color: #fff3cd; color: #856404; border-radius: 5px; padding: 10px; text-align: center; font-weight: bold;"
