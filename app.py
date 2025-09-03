@@ -1,191 +1,131 @@
-import React, { useState, useEffect } from 'react';
+import streamlit as st
+import random
+import time
 
-// This is a single-file React component that creates a trading dashboard.
-// It shows mock trading signals based on EMA, PCR, and RSI for different indices.
+# Streamlit App for Trading Dashboard
 
-const calculateEMA = (prices, period) => {
-  if (!prices || prices.length < period) return null;
-  const k = 2 / (period + 1);
-  let ema = prices[0];
-  for (let i = 1; i < prices.length; i++) {
-    ema = prices[i] * k + ema * (1 - k);
-  }
-  return ema;
-};
+# Helper function to calculate EMA
+def calculate_ema(prices, period):
+    if not prices or len(prices) < period:
+        return None
+    k = 2 / (period + 1)
+    ema = prices[0]
+    for i in range(1, len(prices)):
+        ema = prices[i] * k + ema * (1 - k)
+    return ema
 
-const indices = [
-  { name: 'NIFTY 50', basePrice: 22500, volatility: 20 },
-  { name: 'BANKNIFTY', basePrice: 48000, volatility: 50 },
-  { name: 'FINNIFTY', basePrice: 21500, volatility: 30 },
-];
+# Mock data for different indices
+indices_data = {
+    'NIFTY 50': {'base_price': 22500, 'volatility': 20},
+    'BANKNIFTY': {'base_price': 48000, 'volatility': 50},
+    'FINNIFTY': {'base_price': 21500, 'volatility': 30},
+}
 
-const App = () => {
-  const [selectedIndex, setSelectedIndex] = useState(indices[0]);
-  const [spotPrice, setSpotPrice] = useState(0);
-  const [strikePrice, setStrikePrice] = useState(0);
-  const [emaSignal, setEmaSignal] = useState('Sideways');
-  const [pcrSignal, setPcrSignal] = useState('Neutral');
-  const [rsiSignal, setRsiSignal] = useState('Neutral');
-  const [history, setHistory] = useState([]);
+# App Title and Description
+st.title('NSE Trading Dashboard')
+st.markdown('<p class="text-center text-sm sm:text-base text-gray-400 mb-6"> <span style="font-weight:bold; color:red;">Warning:</span> This app is for educational purposes only. The data is simulated and should not be used for real trading decisions.</p>', unsafe_allow_html=True)
 
-  // Mock data simulation for live market feed
-  useEffect(() => {
-    // This function creates the historical price data required to calculate the EMA.
-    const generateInitialHistory = (basePrice, volatility) => {
-      const initialPrices = [];
-      let currentPrice = basePrice;
-      for (let i = 0; i < 50; i++) {
-        currentPrice += (Math.random() - 0.5) * volatility;
-        initialPrices.push(currentPrice);
-      }
-      setHistory(initialPrices);
-    };
+# Index Selection
+selected_index_name = st.selectbox(
+    'Select Index:',
+    list(indices_data.keys())
+)
 
-    generateInitialHistory(selectedIndex.basePrice, selectedIndex.volatility);
-
-    const interval = setInterval(() => {
-      // Update the mock data
-      setSpotPrice(prevPrice => prevPrice + (Math.random() - 0.5) * selectedIndex.volatility);
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [selectedIndex]);
-
-  // Calculate indicators and signals whenever spotPrice changes
-  useEffect(() => {
-    if (spotPrice === 0) return;
-
-    // Add new spot price to history and keep it at a reasonable length
-    setHistory(prevHistory => {
-      const newHistory = [...prevHistory, spotPrice].slice(-50);
-      const latestPrices = newHistory;
-
-      // Calculate EMAs
-      const lowestEMA = calculateEMA(latestPrices, 3);
-      const mediumEMA = calculateEMA(latestPrices, 13);
-      const longestEMA = calculateEMA(latestPrices, 9);
-      
-      // Calculate Strike Price (simulated)
-      setStrikePrice(Math.round(spotPrice / 50) * 50);
-
-      // EMA Crossover Signal Logic (based on user's pine script)
-      if (lowestEMA > mediumEMA && lowestEMA > longestEMA) {
-        setEmaSignal('Buy (CE)');
-      } else if (lowestEMA < mediumEMA && lowestEMA < longestEMA) {
-        setEmaSignal('Sell (PE)');
-      } else {
-        setEmaSignal('Sideways');
-      }
-
-      // Simulate PCR
-      const pcr = 0.8 + Math.random() * 0.4;
-      if (pcr > 1.1) {
-        setPcrSignal('Bullish');
-      } else if (pcr < 0.9) {
-        setPcrSignal('Bearish');
-      } else {
-        setPcrSignal('Neutral');
-      }
-
-      // Simulate RSI
-      const rsi = 30 + Math.random() * 40;
-      if (rsi > 70) {
-        setRsiSignal('Overbought');
-      } else if (rsi < 30) {
-        setRsiSignal('Oversold');
-      } else {
-        setRsiSignal('Neutral');
-      }
-
-      return newHistory;
-    });
-
-  }, [spotPrice, selectedIndex]);
-
-  const getSignalColor = (signal) => {
-    switch (signal) {
-      case 'Buy (CE)':
-      case 'Bullish':
-        return 'bg-green-600';
-      case 'Sell (PE)':
-      case 'Bearish':
-        return 'bg-red-600';
-      case 'Sideways':
-      case 'Neutral':
-      case 'Overbought':
-      case 'Oversold':
-        return 'bg-yellow-600';
-      default:
-        return 'bg-gray-500';
+# Initialize session state for data history
+if 'history' not in st.session_state:
+    st.session_state.history = {
+        'NIFTY 50': [indices_data['NIFTY 50']['base_price']],
+        'BANKNIFTY': [indices_data['BANKNIFTY']['base_price']],
+        'FINNIFTY': [indices_data['FINNIFTY']['base_price']],
     }
-  };
 
-  return (
-    <div className="bg-gray-900 min-h-screen text-white font-inter p-4 sm:p-8 flex flex-col items-center">
-      <div className="container mx-auto max-w-4xl">
-        <h1 className="text-4xl sm:text-5xl font-bold text-center mb-6 text-yellow-400">
-          NSE Trading Dashboard
-        </h1>
-        <p className="text-center text-sm sm:text-base text-gray-400 mb-6">
-          <span className="font-bold text-red-400">Warning:</span> This app is for educational purposes only. The data is simulated and should not be used for real trading decisions.
-        </p>
+# Display a container for live data
+live_data_container = st.empty()
 
-        {/* Index selection dropdown */}
-        <div className="flex justify-center mb-8">
-          <select 
-            className="p-3 bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-            value={selectedIndex.name}
-            onChange={(e) => {
-              const newIndex = indices.find(idx => idx.name === e.target.value);
-              setSelectedIndex(newIndex);
-            }}
-          >
-            {indices.map((index) => (
-              <option key={index.name} value={index.name}>
-                {index.name}
-              </option>
-            ))}
-          </select>
-        </div>
+# The main loop to simulate live data updates
+while True:
+    with live_data_container.container():
+        # Get data for the selected index
+        current_index = indices_data[selected_index_name]
+        history = st.session_state.history[selected_index_name]
+        
+        # Simulate new spot price
+        new_spot_price = history[-1] + (random.random() - 0.5) * current_index['volatility']
+        
+        # Update history and keep it at a reasonable length
+        history.append(new_spot_price)
+        history = history[-50:]
+        st.session_state.history[selected_index_name] = history
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8 text-center">
-          <div className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-300">Spot Price</h2>
-            <p className="text-3xl sm:text-4xl font-bold mt-2 text-white">₹{spotPrice.toFixed(2)}</p>
-          </div>
-          <div className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-300">Strike Price</h2>
-            <p className="text-3xl sm:text-4xl font-bold mt-2 text-white">₹{strikePrice.toFixed(2)}</p>
-          </div>
-        </div>
+        latest_prices = history
+        
+        # Calculate indicators
+        lowest_ema = calculate_ema(latest_prices, 3)
+        medium_ema = calculate_ema(latest_prices, 13)
+        longest_ema = calculate_ema(latest_prices, 9)
+        
+        # EMA Crossover Signal Logic
+        ema_signal = 'Sideways'
+        if lowest_ema and medium_ema and longest_ema:
+            if lowest_ema > medium_ema and lowest_ema > longest_ema:
+                ema_signal = 'Buy (CE)'
+            elif lowest_ema < medium_ema and lowest_ema < longest_ema:
+                ema_signal = 'Sell (PE)'
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 text-center">
-            <h3 className="text-xl font-semibold text-gray-300">EMA Signal</h3>
-            <div className={`p-4 mt-4 rounded-xl font-bold text-lg ${getSignalColor(emaSignal)}`}>
-              {emaSignal}
-            </div>
-          </div>
-          <div className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 text-center">
-            <h3 className="text-xl font-semibold text-gray-300">PCR Signal</h3>
-            <div className={`p-4 mt-4 rounded-xl font-bold text-lg ${getSignalColor(pcrSignal)}`}>
-              {pcrSignal}
-            </div>
-          </div>
-          <div className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 text-center">
-            <h3 className="text-xl font-semibold text-gray-300">RSI Signal</h3>
-            <div className={`p-4 mt-4 rounded-xl font-bold text-lg ${getSignalColor(rsiSignal)}`}>
-              {rsiSignal}
-            </div>
-          </div>
-        </div>
+        # Simulate PCR and RSI
+        pcr = 0.8 + random.random() * 0.4
+        pcr_signal = 'Neutral'
+        if pcr > 1.1:
+            pcr_signal = 'Bullish'
+        elif pcr < 0.9:
+            pcr_signal = 'Bearish'
+        
+        rsi = 30 + random.random() * 40
+        rsi_signal = 'Neutral'
+        if rsi > 70:
+            rsi_signal = 'Overbought'
+        elif rsi < 30:
+            rsi_signal = 'Oversold'
+            
+        # Calculate Strike Price (simulated)
+        strike_price = round(new_spot_price / 50) * 50
 
-        <div className="mt-8 text-center text-gray-400">
-          <p className="text-sm">This app simulates live NSE data and is for demonstration purposes only.</p>
-        </div>
-      </div>
-    </div>
-  );
-};
+        # Display metrics
+        st.metric("Spot Price", f"₹{new_spot_price:.2f}")
+        st.metric("Strike Price", f"₹{strike_price:.2f}")
 
-export default App;
+        # Display signals with colors
+        st.subheader("Trading Signals")
+        
+        def display_signal(label, signal, color):
+            st.markdown(
+                f"""
+                <div style="background-color:{color}; padding:1rem; border-radius:0.5rem; text-align:center; margin-bottom:1rem;">
+                    <h3 style="margin:0; font-size:1.25rem;">{label}</h3>
+                    <p style="margin:0; font-weight:bold; font-size:1.5rem;">{signal}</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        if ema_signal == 'Buy (CE)':
+            display_signal('EMA Signal', ema_signal, '#16a34a')
+        elif ema_signal == 'Sell (PE)':
+            display_signal('EMA Signal', ema_signal, '#dc2626')
+        else:
+            display_signal('EMA Signal', ema_signal, '#d97706')
+
+        if pcr_signal == 'Bullish':
+            display_signal('PCR Signal', pcr_signal, '#16a34a')
+        elif pcr_signal == 'Bearish':
+            display_signal('PCR Signal', pcr_signal, '#dc2626')
+        else:
+            display_signal('PCR Signal', pcr_signal, '#d97706')
+
+        if rsi_signal == 'Overbought' or rsi_signal == 'Oversold':
+            display_signal('RSI Signal', rsi_signal, '#d97706')
+        else:
+            display_signal('RSI Signal', rsi_signal, '#16a34a' if rsi_signal == 'Bullish' else '#dc2626' if rsi_signal == 'Bearish' else '#d97706')
+
+    # Wait for a few seconds before the next update
+    time.sleep(2)
