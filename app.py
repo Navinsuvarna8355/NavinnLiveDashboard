@@ -144,31 +144,30 @@ def display_index_dashboard(column, index_name, live_data, history):
                 rsi_signal = 'Overbought'
             elif rsi < 30:
                 rsi_signal = 'Oversold'
-
-            # Use Streamlit's built-in components for a better UI
-            st.markdown("**EMA**")
-            if 'Buy' in ema_signal:
-                st.success(f"▲ {ema_signal}")
-            elif 'Sell' in ema_signal:
-                st.error(f"▼ {ema_signal}")
-            else:
-                st.info(f"▬ {ema_signal}")
-
-            st.markdown("**PCR**")
-            if 'Bullish' in pcr_signal:
-                st.success(f"▲ {pcr_signal}")
-            elif 'Bearish' in pcr_signal:
-                st.error(f"▼ {pcr_signal}")
-            else:
-                st.info(f"▬ {pcr_signal}")
             
-            st.markdown("**RSI**")
-            if 'Overbought' in rsi_signal:
-                st.warning(f"⚠ {rsi_signal}")
-            elif 'Oversold' in rsi_signal:
-                st.warning(f"⚠ {rsi_signal}")
-            else:
-                st.info(f"▬ {rsi_signal}")
+            # Helper function to get the correct color for the signal boxes
+            def get_signal_box_style(signal):
+                if 'Buy' in signal or 'Bullish' in signal:
+                    return "background-color: #d4edda; color: #155724; border-radius: 5px; padding: 10px; text-align: center; font-weight: bold;"
+                elif 'Sell' in signal or 'Bearish' in signal:
+                    return "background-color: #f8d7da; color: #721c24; border-radius: 5px; padding: 10px; text-align: center; font-weight: bold;"
+                elif 'Overbought' in signal or 'Oversold' in signal:
+                    return "background-color: #fff3cd; color: #856404; border-radius: 5px; padding: 10px; text-align: center; font-weight: bold;"
+                else:
+                    return "background-color: #e2e3e5; color: #495057; border-radius: 5px; padding: 10px; text-align: center; font-weight: bold;"
+            
+            st.markdown(f"**EMA**")
+            st.markdown(f"<div style='{get_signal_box_style(ema_signal)}'>{ema_signal}</div>", unsafe_allow_html=True)
+            
+            st.markdown("---")
+
+            st.markdown(f"**PCR**")
+            st.markdown(f"<div style='{get_signal_box_style(pcr_signal)}'>{pcr_signal}</div>", unsafe_allow_html=True)
+
+            st.markdown("---")
+
+            st.markdown(f"**RSI**")
+            st.markdown(f"<div style='{get_signal_box_style(rsi_signal)}'>{rsi_signal}</div>", unsafe_allow_html=True)
 
 
 # Display each index in its own column
