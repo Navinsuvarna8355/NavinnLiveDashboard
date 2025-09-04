@@ -18,11 +18,12 @@ SYMBOL_MAP = {
 def fetch_option_chain(symbol_key):
     """
     Fetches option chain data for a given symbol and caches it for 60 seconds.
+    Includes robust error handling and returns a dictionary with fetch time.
     """
     symbol_name = SYMBOL_MAP.get(symbol_key)
     if not symbol_name:
         st.error("Invalid symbol selected.")
-        return None, None, None
+        return None
 
     nse_oc_url = f"https://www.nseindia.com/api/option-chain-indices?symbol={symbol_name}"
     
