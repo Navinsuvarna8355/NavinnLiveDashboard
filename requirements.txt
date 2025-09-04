@@ -1,6 +1,3 @@
-streamlit
-pandas
-requests
-ta-lib
 flask
-
+flask-cors
+requests
