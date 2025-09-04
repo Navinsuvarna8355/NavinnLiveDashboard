@@ -4,12 +4,15 @@ from datetime import datetime
 import requests
 import time
 import plotly.graph_objects as go
-from concurrent.futures import ThreadPoolExecutor
 
 # --- Utility Functions ---
+
 @st.cache_data(ttl=60)
 def fetch_option_chain(symbol="BANKNIFTY"):
-    """Fetches option chain data for a given symbol and caches it for 60 seconds."""
+    """
+    Fetches option chain data for a given symbol and caches it for 60 seconds.
+    Includes robust error handling.
+    """
     nse_oc_url = f"https://www.nseindia.com/api/option-chain-indices?symbol={symbol}"
     headers = {
         "User-Agent": "Mozilla/5.0",
@@ -17,6 +20,7 @@ def fetch_option_chain(symbol="BANKNIFTY"):
     }
     session = requests.Session()
     session.headers.update(headers)
+    
     try:
         resp = session.get(nse_oc_url, timeout=5)
         resp.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
@@ -43,7 +47,6 @@ def detect_decay(oc_data, underlying, decay_range=150):
         ce_data = strike_data["CE"]
         pe_data = strike_data["PE"]
 
-        # Use robust error handling with .get()
         ce_theta = ce_data.get("theta", 0)
         pe_theta = pe_data.get("theta", 0)
         ce_chg = ce_data.get("change", 0)
@@ -123,17 +126,14 @@ with col1:
     refresh_rate = st.slider("Refresh Rate (seconds)", 30, 120, 60, step=15)
     
     # Fetch data on button click or auto-refresh
-    if st.button("Manual Fetch") or auto_refresh:
-        placeholder = st.empty()
-        with placeholder.container():
-            st.info("Fetching live data...")
+    if st.button("Manual Fetch") or st.session_state.oc_data is None:
+        with st.spinner("Fetching live data..."):
             oc_data, underlying, expiry_dates = fetch_option_chain()
             if oc_data:
                 st.session_state.oc_data = oc_data
                 st.session_state.underlying = underlying
                 st.session_state.expiry_dates = expiry_dates
-            st.empty() # Clear the info message
-        
+    
     if st.session_state.oc_data:
         # Display underlying and allow expiry selection
         st.metric("Underlying Value", st.session_state.underlying)
@@ -169,6 +169,6 @@ with col2:
             st.plotly_chart(chart_fig, use_container_width=True)
             
 # Auto-refresh loop
-if auto_refresh and st.session_state.oc_data:
+if auto_refresh:
     time.sleep(refresh_rate)
     st.rerun()
