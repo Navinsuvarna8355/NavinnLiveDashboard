@@ -15,10 +15,10 @@ SYMBOL_MAP = {
 }
 
 @st.cache_data(ttl=60)
-def fetch_option_chain(symbol_key, cache_key_value):
+def fetch_option_chain(symbol_key, current_time_key):
     """
     Fetches option chain data for a given symbol.
-    A unique `cache_key_value` is used to force a cache refresh.
+    A unique `current_time_key` is used to force a cache refresh.
     """
     symbol_name = SYMBOL_MAP.get(symbol_key)
     if not symbol_name:
@@ -156,7 +156,6 @@ with col1:
     if fetch_button or st.session_state.data_container is None or selected_symbol != st.session_state.selected_symbol:
         st.session_state.selected_symbol = selected_symbol
         with st.spinner(f"Fetching live data for {selected_symbol}..."):
-            # The corrected call to the cached function with a unique key
             data_dict = fetch_option_chain(selected_symbol, datetime.now())
             if data_dict:
                 st.session_state.data_container = data_dict
@@ -198,8 +197,9 @@ with col2:
             
 # Auto-refresh loop
 if auto_refresh and st.session_state.data_container:
+    # A new line to force a unique key and bypass the cache on every refresh
     time.sleep(refresh_rate)
-    st.rerun()
+    st.experimental_rerun()
 
 # --- Recommendations ---
 
