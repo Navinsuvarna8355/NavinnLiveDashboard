@@ -121,7 +121,7 @@ if "data_container" not in st.session_state:
 if "last_fetch_time" not in st.session_state:
     st.session_state.last_fetch_time = 0
 
-# --- Settings Sidebar ---
+# --- Settings ---
 col1, col2 = st.columns([1, 2])
 with col1:
     st.header("Settings")
@@ -207,6 +207,3 @@ if st.session_state.data_container:
         st.subheader("Market Bias: Neutral/Range-bound")
         st.markdown("""
         **Recommended Strategies:**
-        * Sell Straddle or Strangle
-        * Iron Condor
-        """)
