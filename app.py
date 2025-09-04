@@ -16,7 +16,7 @@ SYMBOL_MAP = {
 def fetch_option_chain(symbol_key, current_time_key):
     """
     Fetches option chain data for a given symbol.
-    A unique `current_time_key` is used to force a cache refresh.
+    A unique `current_time_key` is used to force a cache refresh every minute.
     """
     symbol_name = SYMBOL_MAP.get(symbol_key)
     if not symbol_name:
@@ -54,12 +54,10 @@ def detect_decay(oc_data, underlying, decay_range=150):
     for strike_data in atm_strikes:
         ce_data = strike_data["CE"]
         pe_data = strike_data["PE"]
-
         ce_theta = ce_data.get("theta", 0)
         pe_theta = pe_data.get("theta", 0)
         ce_chg = ce_data.get("change", 0)
         pe_chg = pe_data.get("change", 0)
-
         decay_side = "Both"
 
         if ce_theta != 0 and pe_theta != 0:
@@ -83,7 +81,6 @@ def detect_decay(oc_data, underlying, decay_range=150):
         })
     
     df = pd.DataFrame(details).sort_values(by="strikePrice")
-    
     ce_count = df[df['Decay_Side'] == 'CE'].shape[0]
     pe_count = df[df['Decay_Side'] == 'PE'].shape[0]
     
@@ -129,8 +126,6 @@ st.title("📊 Decay + Directional Bias Detector")
 if "data_container" not in st.session_state:
     st.session_state.data_container = None
     st.session_state.selected_symbol = "Bank Nifty"
-if "last_fetch_time" not in st.session_state:
-    st.session_state.last_fetch_time = time.time()
 
 # --- Settings Sidebar ---
 col1, col2 = st.columns([1, 2])
@@ -146,16 +141,22 @@ with col1:
     fetch_button = st.button("Manual Fetch")
 
 # --- Fetch Logic ---
-current_time = time.time()
+# Use an integer key for caching to avoid constant re-runs
+current_minute = int(time.time() // 60)
+
 if fetch_button or st.session_state.data_container is None or selected_symbol != st.session_state.selected_symbol:
     st.session_state.selected_symbol = selected_symbol
     with st.spinner(f"Fetching live data for {selected_symbol}..."):
-        data_dict = fetch_option_chain(selected_symbol, datetime.now())
+        data_dict = fetch_option_chain(selected_symbol, current_minute)
         if data_dict:
             st.session_state.data_container = data_dict
-            st.session_state.last_fetch_time = current_time
         else:
             st.session_state.data_container = None
+            
+# --- Auto-refresh logic with a loop to ensure it works
+if auto_refresh:
+    time.sleep(1) # Add a small sleep to prevent rapid re-runs
+    st.rerun()
 
 # --- Left Column UI ---
 with col1:
@@ -218,8 +219,3 @@ if st.session_state.data_container:
         * **Sell Straddle or Strangle**: Profit from time decay when the market is expected to remain stable.
         * **Iron Condor**: A risk-defined strategy to profit from a non-trending market.
         """)
-
-# --- Auto-refresh loop ---
-if auto_refresh:
-    time.sleep(refresh_rate)
-    st.rerun()
