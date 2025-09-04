@@ -33,9 +33,8 @@ def fetch_option_chain(symbol_key, current_time_key):
     session.headers.update(headers)
     
     try:
-        # Increased timeout to 15 seconds to prevent read timeouts
         resp = session.get(nse_oc_url, timeout=15)
-        resp.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
+        resp.raise_for_status()
         data = resp.json()
         
         return {
@@ -49,13 +48,9 @@ def fetch_option_chain(symbol_key, current_time_key):
         return None
 
 def detect_decay(oc_data, underlying, decay_range=150):
-    """
-    Analyzes option chain data to detect decay bias.
-    """
     atm_strikes = [d for d in oc_data if abs(d["strikePrice"] - underlying) <= decay_range and "CE" in d and "PE" in d]
     
     details = []
-
     for strike_data in atm_strikes:
         ce_data = strike_data["CE"]
         pe_data = strike_data["PE"]
@@ -66,7 +61,6 @@ def detect_decay(oc_data, underlying, decay_range=150):
         pe_chg = pe_data.get("change", 0)
 
         decay_side = "Both"
-
         if ce_theta != 0 and pe_theta != 0:
             if abs(ce_theta) > abs(pe_theta) and ce_chg < 0:
                 decay_side = "CE"
@@ -88,7 +82,6 @@ def detect_decay(oc_data, underlying, decay_range=150):
         })
     
     df = pd.DataFrame(details).sort_values(by="strikePrice")
-    
     ce_count = df[df['Decay_Side'] == 'CE'].shape[0]
     pe_count = df[df['Decay_Side'] == 'PE'].shape[0]
     
@@ -101,23 +94,19 @@ def detect_decay(oc_data, underlying, decay_range=150):
     return overall_decay_side, df
 
 def create_decay_chart(df):
-    """Creates an interactive bar chart for theta values."""
     fig = go.Figure()
-    
     fig.add_trace(go.Bar(
         x=df['strikePrice'],
         y=df['CE_theta'].abs(),
         name='CE Theta (Abs)',
         marker_color='#FF5733'
     ))
-    
     fig.add_trace(go.Bar(
         x=df['strikePrice'],
         y=df['PE_theta'].abs(),
         name='PE Theta (Abs)',
         marker_color='#0080FF'
     ))
-
     fig.update_layout(
         title='Absolute Theta Values by Strike Price',
         xaxis_title='Strike Price',
@@ -156,7 +145,6 @@ current_time = time.time()
 if st.session_state.data_container is None or selected_symbol != st.session_state.selected_symbol or fetch_button:
     st.session_state.selected_symbol = selected_symbol
     with st.spinner(f"Fetching live data for {selected_symbol}..."):
-        # The key is now based on refresh rate
         data_dict = fetch_option_chain(selected_symbol, current_time // refresh_rate)
         if data_dict:
             st.session_state.data_container = data_dict
@@ -164,9 +152,13 @@ if st.session_state.data_container is None or selected_symbol != st.session_stat
         else:
             st.session_state.data_container = None
 
-# --- Auto-refresh logic
-if auto_refresh and st.session_state.data_container and (current_time - st.session_state.last_fetch_time >= refresh_rate):
-    st.session_state.last_fetch_time = current_time
+# --- Auto-refresh logic (UPDATED) ---
+if auto_refresh and (current_time - st.session_state.last_fetch_time >= refresh_rate):
+    with st.spinner(f"Auto-refreshing data for {st.session_state.selected_symbol}..."):
+        data_dict = fetch_option_chain(st.session_state.selected_symbol, current_time // refresh_rate)
+        if data_dict:
+            st.session_state.data_container = data_dict
+            st.session_state.last_fetch_time = current_time
     st.rerun()
 
 # --- Left Column UI ---
@@ -194,7 +186,7 @@ with col2:
             st.dataframe(df, width='stretch')
         with tab2:
             chart_fig = create_decay_chart(df)
-            st.plotly_chart(chart_fig, width='stretch')
+            st.plotly_chart(chart_fig, use_container_width=True)
     else:
         st.info("Live analysis will appear here after fetching data.")
 
@@ -209,24 +201,19 @@ if st.session_state.data_container:
         st.write("Call options are losing premium faster than Put options, indicating that traders are actively selling calls. This suggests a bearish or non-trending market sentiment.")
         st.markdown("""
         **Recommended Strategies:**
-        * **Sell Call Options (Short Call)**: A direct way to profit from falling CE premiums.
-        * **Buy Put Options (Long Put)**: A directional trade to profit from a falling market.
-        * **Bear Put Spread**: A risk-defined strategy for a bearish outlook.
+        * **Sell Call Options (Short Call)**
+        * **Buy Put Options (Long Put)**
+        * **Bear Put Spread**
         """)
     elif decay_side == "PE Decay Active":
         st.subheader("Market Bias: Bullish (Upside)")
         st.write("Put options are losing premium faster than Call options. This suggests a bullish or upward-trending market sentiment, as traders are actively selling puts.")
         st.markdown("""
         **Recommended Strategies:**
-        * **Sell Put Options (Short Put)**: A direct way to profit from falling PE premiums.
-        * **Buy Call Options (Long Call)**: A directional trade to profit from a rising market.
-        * **Bull Call Spread**: A risk-defined strategy for a bullish outlook.
+        * **Sell Put Options (Short Put)**
+        * **Buy Call Options (Long Call)**
+        * **Bull Call Spread**
         """)
     else:
         st.subheader("Market Bias: Neutral/Range-bound")
-        st.write("Both Call and Put options are experiencing similar levels of decay. This suggests the market is not showing a strong directional bias and may be trading in a range.")
-        st.markdown("""
-        **Recommended Strategies:**
-        * **Sell Straddle or Strangle**: Profit from time decay when the market is expected to remain stable.
-        * **Iron Condor**: A risk-defined strategy to profit from a non-trending market.
-        """)
+        st.write
