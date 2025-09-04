@@ -1,4 +1,6 @@
-@st.cache_data(ttl=60)
+import time
+
+@st.cache
 def fetch_option_chain(symbol_key, current_time_key):
     symbol_name = SYMBOL_MAP.get(symbol_key)
     if not symbol_name:
@@ -28,7 +30,5 @@ def fetch_option_chain(symbol_key, current_time_key):
         st.error(f"Error fetching data for {symbol_key}: {e}")
         return None
 
-# Later in your Streamlit UI code, when displaying the timestamp:
-if st.session_state.data_container:
-    fetch_time = st.session_state.data_container['fetch_time']
-    st.caption(f"Last updated: {fetch_time.strftime('%H:%M:%S')}")
+# When calling fetch_option_chain, pass a time-based key to force refresh every 60 seconds
+data_dict = fetch_option_chain(selected_symbol, int(time.time() // 60))
