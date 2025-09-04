@@ -76,7 +76,7 @@ def detect_decay(oc_data, underlying, decay_range=150):
         elif ce_chg < 0 and pe_chg < 0:
             if abs(ce_chg) > abs(pe_chg):
                 decay_side = "CE"
-            elif abs(pe_chg) > abs(pe_chg):
+            elif abs(pe_chg) > abs(ce_chg):
                 decay_side = "PE"
 
         details.append({
@@ -156,6 +156,7 @@ with col1:
     if fetch_button or st.session_state.data_container is None or selected_symbol != st.session_state.selected_symbol:
         st.session_state.selected_symbol = selected_symbol
         with st.spinner(f"Fetching live data for {selected_symbol}..."):
+            # The corrected call to the cached function with a unique key
             data_dict = fetch_option_chain(selected_symbol, datetime.now())
             if data_dict:
                 st.session_state.data_container = data_dict
