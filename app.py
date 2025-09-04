@@ -3,21 +3,32 @@ import pandas as pd
 import time
 import requests
 
+# ---------- CONFIG ----------
 st.set_page_config(page_title="Decay + Directional Bias Detector", layout="wide")
+API_URL = "https://your-backend-endpoint.com/get_data"  # <-- Replace with your API
+REFRESH_RATE = 10  # seconds
 
-# --- AUTO REFRESH ---
-# Refresh every 10 seconds
-st_autorefresh = st.experimental_autorefresh(interval=10_000, key="datarefresh")
+# ---------- AUTO-REFRESH (works on all versions) ----------
+last_refresh = st.session_state.get("last_refresh", 0)
+now = time.time()
+if now - last_refresh > REFRESH_RATE:
+    st.session_state["last_refresh"] = now
+    st.experimental_rerun()
 
 st.title("Decay + Directional Bias Detector")
 
-API_URL = "https://your-backend-endpoint.com/get_data"  # Replace with your API
-
+# ---------- FETCH LIVE DATA ----------
 def fetch_live_data():
     try:
         resp = requests.get(API_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+
         if resp.status_code != 200:
             st.warning(f"⚠ API returned status {resp.status_code}")
+            return pd.DataFrame()
+
+        raw = resp.text.strip()
+        if not raw or (not raw.startswith("{") and not raw.startswith("[")):
+            st.warning("⚠ API returned empty or non‑JSON data.")
             return pd.DataFrame()
 
         try:
@@ -31,21 +42,25 @@ def fetch_live_data():
         elif isinstance(data, list):
             return pd.DataFrame(data)
         else:
-            st.error("❌ Unexpected data format from API.")
+            st.warning("⚠ Unexpected data format.")
             return pd.DataFrame()
 
     except requests.exceptions.RequestException as e:
-        st.error(f"❌ Error fetching data: {e}")
+        st.error(f"❌ Fetch error: {e}")
         return pd.DataFrame()
 
+# ---------- GET DATA ----------
 df = fetch_live_data()
 
+# ---------- DISPLAY ----------
 if not df.empty:
+    # Underlying value
     if "underlying" in df.columns:
         st.subheader(f"Underlying: {df['underlying'].iloc[0]}")
     elif "Underlying" in df.columns:
         st.subheader(f"Underlying: {df['Underlying'].iloc[0]}")
 
+    # Bias calculation
     if "CE_theta" in df.columns and "PE_theta" in df.columns:
         df["strength_score"] = df["CE_theta"] - df["PE_theta"]
 
@@ -59,8 +74,11 @@ if not df.empty:
 
         df["bias"] = df["strength_score"].apply(bias_label)
 
+    # Show table
     st.dataframe(df)
+
 else:
     st.info("No data available. Check API or connection.")
 
+# ---------- LAST UPDATED ----------
 st.caption(f"Last updated: {time.strftime('%H:%M:%S')}")
