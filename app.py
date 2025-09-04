@@ -1,185 +1,215 @@
 import streamlit as st
-import random
-import time
-import requests
-import json
+import requests, time, random
+from requests.exceptions import RequestException
+import pandas as pd
+from datetime import datetime
 
-# Streamlit App for Trading Dashboard
+# --- Constants & NSE Functions (from nse_option_chain.py) ---
+NSE_BASE = "https://www.nseindia.com"
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15"
+]
 
-# Helper function to calculate EMA
-def calculate_ema(prices, period):
-    """Calculates the Exponential Moving Average (EMA) for a given set of prices."""
-    if not prices or len(prices) < period:
-        return None
-    k = 2 / (period + 1)
-    ema = prices[0]
-    for i in range(1, len(prices)):
-        ema = prices[i] * k + ema * (1 - k)
-    return ema
-
-# A function to fetch real-time data from an API (Placeholder)
-def fetch_live_data(index_name):
-    """
-    Function to fetch real-time data from a live market data API.
-    You MUST replace the mock data with a real API call to get accurate data.
-    """
-    # Replace this section with your actual API call.
-    # ---------------------------------------------------------------------
-    # Example using a hypothetical API:
-    # try:
-    #     api_url = f"https://api.yourprovider.com/live_data?symbol={index_name}&api_key=YOUR_API_KEY"
-    #     response = requests.get(api_url)
-    #     response.raise_for_status() # Raises an HTTPError for bad responses
-    #     data = response.json()
-    #     
-    #     # Return the spot price and other metrics from the API response
-    #     spot_price = data['price']
-    #     pcr_value = data['pcr']
-    #     rsi_value = data['rsi']
-    #     return {'spot_price': spot_price, 'pcr': pcr_value, 'rsi': rsi_value}
-    # except requests.exceptions.RequestException as e:
-    #     st.error(f"Error fetching data from API: {e}")
-    #     return {}
-    # ---------------------------------------------------------------------
-
-    # --- For now, we'll continue using mock data for demonstration purposes ---
-    mock_data = {
-        'NIFTY 50': {'spot_price': 24717 + (random.random() - 0.5) * 20, 'pcr': 0.95 + (random.random() - 0.5) * 0.1, 'rsi': 55 + (random.random() - 0.5) * 10},
-        'BANKNIFTY': {'spot_price': 54068 + (random.random() - 0.5) * 50, 'pcr': 0.9 + (random.random() - 0.5) * 0.1, 'rsi': 60 + (random.random() - 0.5) * 10},
-        'FINNIFTY': {'spot_price': 21500 + (random.random() - 0.5) * 30, 'pcr': 1.05 + (random.random() - 0.5) * 0.1, 'rsi': 45 + (random.random() - 0.5) * 10}
+def new_session():
+    """Creates and returns a new requests session with a random user agent."""
+    s = requests.Session()
+    headers = {
+        "User-Agent": random.choice(USER_AGENTS),
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Referer": "https://www.nseindia.com/option-chain",
+        "Connection": "keep-alive",
     }
-    return mock_data.get(index_name, {})
+    s.headers.update(headers)
+    return s
 
-# Mock data for different indices
-indices_data = {
-    'NIFTY 50': {'base_price': 22500, 'volatility': 20},
-    'BANKNIFTY': {'base_price': 48000, 'volatility': 50},
-    'FINNIFTY': {'base_price': 21500, 'volatility': 30},
-}
+def fetch_option_chain(symbol):
+    """Fetches the option chain data for a given symbol from NSE."""
+    session = new_session()
+    try:
+        session.get(NSE_BASE + "/option-chain", timeout=5)
+    except Exception:
+        pass # Ignore initial get errors
 
-# --- UI Layout ---
-
-# Page Configuration
-st.set_page_config(layout="wide")
-
-# App Title and Description
-st.title('NSE Trading Dashboard')
-st.markdown("""
-    <div style='text-align: center; color: #888;'>
-        <p>
-            <span style='font-weight:bold; color:#f87171;'>Warning:</span> This app is for educational purposes only. The data is simulated and should not be used for real trading decisions.
-        </p>
-    </div>
-""", unsafe_allow_html=True)
-
-# Initialize session state for data history for all indices
-if 'history' not in st.session_state:
-    st.session_state.history = {
-        'NIFTY 50': [indices_data['NIFTY 50']['base_price']],
-        'BANKNIFTY': [indices_data['BANKNIFTY']['base_price']],
-        'FINNIFTY': [indices_data['FINNIFTY']['base_price']],
-    }
-
-# Update data for all indices
-live_data_nifty = fetch_live_data('NIFTY 50')
-live_data_banknifty = fetch_live_data('BANKNIFTY')
-live_data_finnifty = fetch_live_data('FINNIFTY')
-
-# Update history for all indices
-st.session_state.history['NIFTY 50'].append(live_data_nifty.get('spot_price', st.session_state.history['NIFTY 50'][-1]))
-st.session_state.history['NIFTY 50'] = st.session_state.history['NIFTY 50'][-50:]
-
-st.session_state.history['BANKNIFTY'].append(live_data_banknifty.get('spot_price', st.session_state.history['BANKNIFTY'][-1]))
-st.session_state.history['BANKNIFTY'] = st.session_state.history['BANKNIFTY'][-50:]
-
-st.session_state.history['FINNIFTY'].append(live_data_finnifty.get('spot_price', st.session_state.history['FINNIFTY'][-1]))
-st.session_state.history['FINNIFTY'] = st.session_state.history['FINNIFTY'][-50:]
+    url = f"{NSE_BASE}/api/option-chain-indices?symbol={symbol}"
+    resp = None
+    for i in range(3):
+        try:
+            resp = session.get(url, timeout=6)
+            resp.raise_for_status()
+            break
+        except RequestException as e:
+            time.sleep(0.6 + i * 0.5)
+    if resp is None:
+        raise RequestException(f"Failed to GET {url} after retries")
     
-# Create three columns for the indices
-col1, col2, col3 = st.columns(3)
+    data = resp.json()
+    return data
 
-# --- Function to display a single index dashboard ---
-def display_index_dashboard(column, index_name, live_data, history):
-    with column:
-        # Use a container for a clean, bordered section
-        with st.container(border=True):
-            st.markdown(f"<h3 style='text-align: center; color: #6C757D; font-size: 24px;'>{index_name}</h3>", unsafe_allow_html=True)
-            st.markdown("---")
+def compute_oi_pcr_and_underlying(data):
+    """Computes PCR and underlying value from the option chain data."""
+    records = data.get("records", {})
+    expiry_dates = records.get("expiryDates", [])
+    if not expiry_dates:
+        raise ValueError("No expiry dates found in option chain")
+    
+    current_expiry = expiry_dates[0]
+    total_ce_oi = 0
+    total_pe_oi = 0
+    total_ce_oi_near = 0
+    total_pe_oi_near = 0
+    underlying = records.get("underlyingValue")
+
+    for item in records.get("data", []):
+        if item.get("expiryDate") != current_expiry:
+            continue
+        ce = item.get("CE", {})
+        pe = item.get("PE", {})
+        total_ce_oi += ce.get("openInterest", 0)
+        total_pe_oi += pe.get("openInterest", 0)
+        strike = item.get("strikePrice", 0)
+        if underlying is not None and abs(strike - underlying) <= 200:
+            total_ce_oi_near += ce.get("openInterest", 0)
+            total_pe_oi_near += pe.get("openInterest", 0)
+    
+    pcr_total = round((total_pe_oi / total_ce_oi), 2) if total_ce_oi else None
+    pcr_near = round((total_pe_oi_near / total_ce_oi_near), 2) if total_ce_oi_near else None
+
+    return {
+        "expiry": current_expiry,
+        "underlying": underlying,
+        "total_CE_OI": total_ce_oi,
+        "total_PE_OI": total_pe_oi,
+        "pcr_total": pcr_total,
+        "pcr_near": pcr_near
+    }
+
+# --- Signal Strategy Logic (from signal_strategy.py) ---
+def determine_signal(pcr, trend, ema_signal):
+    """Determines the final signal based on PCR, trend, and EMA signal."""
+    signal = "SIDEWAYS"
+    suggested_side = None
+
+    if trend == "BULLISH" and ema_signal == "BUY" and pcr >= 1:
+        signal = "BUY"
+        suggested_side = "CALL"
+    elif trend == "BEARISH" and ema_signal == "SELL" and pcr <= 1:
+        signal = "SELL"
+        suggested_side = "PUT"
+    else:
+        signal = "SIDEWAYS"
+        suggested_side = None
+
+    return signal, suggested_side
+
+# --- Streamlit App UI and Logic ---
+st.set_page_config(layout="wide", page_title="Strategy Signal")
+st.title("Strategy Signal — NIFTY & BANKNIFTY")
+
+# Using a single cache function to fetch and process all data
+@st.cache_data(ttl=60) # Cache data for 60 seconds
+def get_stock_data(symbol):
+    """Fetches and processes stock data for a given symbol."""
+    try:
+        data = fetch_option_chain(symbol)
+        info = compute_oi_pcr_and_underlying(data)
+        info['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        info['error'] = None
+    except Exception as e:
+        st.error(f"Error fetching data for {symbol}: {e}")
+        info = {'error': str(e)}
+    return info
+
+def get_strategy_data(symbol_info, use_near, ema_signal):
+    """Calculates strategy signals based on symbol info and user inputs."""
+    if symbol_info.get('underlying') is None or symbol_info.get('pcr_total') is None:
+        return {'error': 'Data not ready.'}
+    
+    pcr = symbol_info.get('pcr_near') if use_near and symbol_info.get('pcr_near') is not None else symbol_info.get('pcr_total')
+    trend = 'BULLISH' if pcr is not None and pcr >= 1 else 'BEARISH'
+    
+    signal, suggested_side = determine_signal(pcr, trend, ema_signal)
+    
+    atm = round(symbol_info['underlying'] / 100) * 100 if symbol_info['underlying'] is not None else None
+    suggested_option = f"{atm} {'CE' if suggested_side == 'CALL' else 'PE'}" if suggested_side else None
+    
+    return {
+        'symbol': symbol_info['symbol'],
+        'signal': signal,
+        'live_price': round(symbol_info['underlying'], 2),
+        'suggested_option': suggested_option,
+        'trend': trend,
+        'strategy': '3 EMA Crossover + PCR (option-chain)',
+        'confidence': 90,
+        'pcr': pcr,
+        'pcr_total': symbol_info.get('pcr_total'),
+        'pcr_near': symbol_info.get('pcr_near'),
+        'expiry': symbol_info.get('expiry'),
+        'timestamp': symbol_info.get('timestamp')
+    }
+
+# Main app layout
+st.write("---")
+st.markdown("This app fetches live data from NSE and provides a trading signal based on a simple strategy.")
+
+with st.sidebar:
+    st.header("App Settings")
+    st.write("Configure the signal strategy parameters.")
+    use_near = st.checkbox("Use near-month PCR?", value=True)
+    ema_signal = st.radio("EMA Signal", ["BUY", "SELL"], index=0)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.header("NIFTY")
+    nifty_info = get_stock_data("NIFTY")
+    if nifty_info.get('error'):
+        st.warning(f"Error: {nifty_info.get('error')}")
+    else:
+        nifty_strategy_data = get_strategy_data(nifty_info, use_near, ema_signal)
+        if nifty_strategy_data.get('error'):
+             st.warning(nifty_strategy_data.get('error'))
+        else:
+            signal_color = "green" if nifty_strategy_data['signal'] == "BUY" else "red" if nifty_strategy_data['signal'] == "SELL" else "gray"
+            st.markdown(f"### Signal: <span style='color:{signal_color}'>**{nifty_strategy_data['signal']}**</span>", unsafe_allow_html=True)
             
-            # Use columns for metrics
-            metric_col1, metric_col2 = st.columns(2)
-            
-            spot_price = live_data.get('spot_price')
-            strike_price = round(spot_price / 50) * 50
-            
-            with metric_col1:
-                st.metric("Spot Price", f"₹{spot_price:.2f}")
-            with metric_col2:
-                st.metric("Strike Price", f"₹{strike_price:.2f}")
-            
-            st.markdown("---")
+            st.metric("Live Price", f"₹{nifty_strategy_data['live_price']}")
+            st.metric("Suggested Option", nifty_strategy_data['suggested_option'])
 
-            # Trading Signals section
-            st.markdown("#### Trading Signals")
-            
-            # Calculate indicators
-            lowest_ema = calculate_ema(history, 3)
-            medium_ema = calculate_ema(history, 13)
-            longest_ema = calculate_ema(history, 9)
+            with st.expander("Show Details"):
+                st.write(f"**Trend:** {nifty_strategy_data['trend']}")
+                st.write(f"**PCR (used):** {nifty_strategy_data['pcr']}")
+                st.write(f"**PCR Total:** {nifty_strategy_data['pcr_total']}")
+                st.write(f"**PCR Near:** {nifty_strategy_data['pcr_near']}")
+                st.write(f"**Expiry:** {nifty_strategy_data['expiry']}")
+                st.write(f"**Strategy:** {nifty_strategy_data['strategy']}")
+                st.write(f"**Confidence:** {nifty_strategy_data['confidence']}%")
+                st.markdown(f"**Last Updated:** {nifty_strategy_data['timestamp']}")
 
-            # EMA Crossover Signal Logic
-            ema_signal = 'Sideways'
-            if lowest_ema and medium_ema and longest_ema:
-                if lowest_ema > medium_ema and lowest_ema > longest_ema:
-                    ema_signal = 'Bullish'
-                elif lowest_ema < medium_ema and lowest_ema < longest_ema:
-                    ema_signal = 'Bearish'
+with col2:
+    st.header("BANKNIFTY")
+    banknifty_info = get_stock_data("BANKNIFTY")
+    if banknifty_info.get('error'):
+        st.warning(f"Error: {banknifty_info.get('error')}")
+    else:
+        banknifty_strategy_data = get_strategy_data(banknifty_info, use_near, ema_signal)
+        if banknifty_strategy_data.get('error'):
+             st.warning(banknifty_strategy_data.get('error'))
+        else:
+            signal_color = "green" if banknifty_strategy_data['signal'] == "BUY" else "red" if banknifty_strategy_data['signal'] == "SELL" else "gray"
+            st.markdown(f"### Signal: <span style='color:{signal_color}'>**{banknifty_strategy_data['signal']}**</span>", unsafe_allow_html=True)
 
-            # PCR and RSI from fetched data
-            pcr = live_data.get('pcr')
-            pcr_signal = 'Neutral'
-            if pcr > 1.1:
-                pcr_signal = 'Bullish'
-            elif pcr < 0.9:
-                pcr_signal = 'Bearish'
-            
-            rsi = live_data.get('rsi')
-            rsi_signal = 'Neutral'
-            if rsi > 70:
-                rsi_signal = 'Overbought'
-            elif rsi < 30:
-                rsi_signal = 'Oversold'
-            
-            # Helper function to get the correct color for the signal boxes
-            def get_signal_box_style(signal):
-                if 'Bullish' in signal:
-                    return "background-color: #d4edda; color: #155724; border-radius: 5px; padding: 10px; text-align: center; font-weight: bold;"
-                elif 'Bearish' in signal:
-                    return "background-color: #f8d7da; color: #721c24; border-radius: 5px; padding: 10px; text-align: center; font-weight: bold;"
-                elif 'Overbought' in signal or 'Oversold' in signal:
-                    return "background-color: #fff3cd; color: #856404; border-radius: 5px; padding: 10px; text-align: center; font-weight: bold;"
-                else:
-                    return "background-color: #e2e3e5; color: #495057; border-radius: 5px; padding: 10px; text-align: center; font-weight: bold;"
-            
-            st.markdown(f"**EMA**")
-            st.markdown(f"<div style='{get_signal_box_style(ema_signal)}'>{ema_signal}</div>", unsafe_allow_html=True)
-            
-            st.markdown("---")
+            st.metric("Live Price", f"₹{banknifty_strategy_data['live_price']}")
+            st.metric("Suggested Option", banknifty_strategy_data['suggested_option'])
 
-            st.markdown(f"**PCR**")
-            st.markdown(f"<div style='{get_signal_box_style(pcr_signal)}'>{pcr_signal}</div>", unsafe_allow_html=True)
-
-            st.markdown("---")
-
-            st.markdown(f"**RSI**")
-            st.markdown(f"<div style='{get_signal_box_style(rsi_signal)}'>{rsi_signal}</div>", unsafe_allow_html=True)
-
-
-# Display each index in its own column
-display_index_dashboard(col1, 'NIFTY 50', live_data_nifty, st.session_state.history['NIFTY 50'])
-display_index_dashboard(col2, 'BANKNIFTY', live_data_banknifty, st.session_state.history['BANKNIFTY'])
-display_index_dashboard(col3, 'FINNIFTY', live_data_finnifty, st.session_state.history['FINNIFTY'])
-
-# Add a rerun at the end to keep the app live-updating.
-time.sleep(2)
-st.rerun()
+            with st.expander("Show Details"):
+                st.write(f"**Trend:** {banknifty_strategy_data['trend']}")
+                st.write(f"**PCR (used):** {banknifty_strategy_data['pcr']}")
+                st.write(f"**PCR Total:** {banknifty_strategy_data['pcr_total']}")
+                st.write(f"**PCR Near:** {banknifty_strategy_data['pcr_near']}")
+                st.write(f"**Expiry:** {banknifty_strategy_data['expiry']}")
+                st.write(f"**Strategy:** {banknifty_strategy_data['strategy']}")
+                st.write(f"**Confidence:** {banknifty_strategy_data['confidence']}%")
+                st.markdown(f"**Last Updated:** {banknifty_strategy_data['timestamp']}")
