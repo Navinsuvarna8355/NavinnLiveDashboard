@@ -2,46 +2,41 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import requests
-import time
 
 # --- CONFIG ---
+REFRESH_RATE = 15  # seconds
 st.set_page_config(page_title="Decay + Directional Bias", layout="wide")
+
+# Inject meta refresh tag
+st.markdown(f"<meta http-equiv='refresh' content='{REFRESH_RATE}'>", unsafe_allow_html=True)
+
+# --- NSE Fetch ---
 NSE_OC_URL = "https://www.nseindia.com/api/option-chain-indices?symbol=BANKNIFTY"
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Accept-Language": "en-US,en;q=0.9",
 }
-REFRESH_RATE = 15  # seconds
 
-# --- AUTO REFRESH (version-independent) ---
-last_refresh = st.session_state.get("last_refresh", 0)
-now = time.time()
-if now - last_refresh > REFRESH_RATE:
-    st.session_state["last_refresh"] = now
-    st.experimental_rerun()
-
-st.title("📊 Decay + Directional Bias Detector (Live)")
-
-# --- FETCH OPTION CHAIN SAFELY ---
 def fetch_option_chain():
     try:
         session = requests.Session()
         session.headers.update(HEADERS)
         resp = session.get(NSE_OC_URL, timeout=5)
-
-        raw = resp.text.strip()
-        if not raw or (not raw.startswith("{") and not raw.startswith("[")):
-            st.warning("⚠ NSE API returned empty or non‑JSON data.")
-            return [], None
-
         data = resp.json()
         return data["records"]["data"], data["records"]["underlyingValue"]
-
     except Exception as e:
         st.error(f"❌ Fetch error: {e}")
         return [], None
 
-# --- DECAY DETECTION ---
+def bias_label(ce_theta, pe_theta):
+    score = ce_theta - pe_theta
+    if score > 0:
+        return "🟢 Call Bias"
+    elif score < 0:
+        return "🔴 Put Bias"
+    else:
+        return "🟡 Neutral"
+
 def detect_decay(oc_data, underlying):
     atm_strikes = [d for d in oc_data if abs(d["strikePrice"] - underlying) <= 100]
     ce_count, pe_count = 0, 0
@@ -84,26 +79,16 @@ def detect_decay(oc_data, underlying):
 
     return decay_side, pd.DataFrame(details)
 
-# --- BIAS LABEL FUNCTION ---
-def bias_label(ce_theta, pe_theta):
-    score = ce_theta - pe_theta
-    if score > 0:
-        return "🟢 Call Bias"
-    elif score < 0:
-        return "🔴 Put Bias"
-    else:
-        return "🟡 Neutral"
+# --- MAIN ---
+st.title("📊 Decay + Directional Bias Detector (Live)")
 
-# --- MAIN EXECUTION ---
 oc_data, underlying = fetch_option_chain()
 
 if oc_data and underlying:
     decay_side, df = detect_decay(oc_data, underlying)
-
     st.subheader(f"Underlying: {underlying}")
     st.metric("Decay Side", decay_side)
     st.dataframe(df)
-
     st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
 else:
     st.info("No data available. Waiting for next refresh...")
