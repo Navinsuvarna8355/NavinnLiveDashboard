@@ -17,8 +17,7 @@ SYMBOL_MAP = {
 @st.cache_data(ttl=60)
 def fetch_option_chain(symbol_key):
     """
-    Fetches option chain data for a given symbol and caches it for 60 seconds.
-    Includes robust error handling and returns a dictionary with fetch time.
+    Fetches option chain data for a given symbol.
     """
     symbol_name = SYMBOL_MAP.get(symbol_key)
     if not symbol_name:
@@ -36,10 +35,9 @@ def fetch_option_chain(symbol_key):
     
     try:
         resp = session.get(nse_oc_url, timeout=5)
-        resp.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
+        resp.raise_for_status()
         data = resp.json()
         
-        # Return a dictionary with all data, including the fetch time
         return {
             "records_data": data["records"]["data"],
             "underlying_value": data["records"]["underlyingValue"],
@@ -52,13 +50,12 @@ def fetch_option_chain(symbol_key):
 
 def detect_decay(oc_data, underlying, decay_range=150):
     """
-    Analyzes option chain data to detect decay bias around the ATM strike.
-    Uses 'theta' as the primary indicator, and 'change' as a fallback.
+    Analyzes option chain data to detect decay bias.
     """
     atm_strikes = [d for d in oc_data if abs(d["strikePrice"] - underlying) <= decay_range and "CE" in d and "PE" in d]
     
     details = []
-
+    # (rest of the detect_decay function remains the same)
     for strike_data in atm_strikes:
         ce_data = strike_data["CE"]
         pe_data = strike_data["PE"]
@@ -179,7 +176,6 @@ with col1:
         
         st.metric("Decay Side", decay_side)
         
-        # The corrected line to display the fetch time from the dictionary
         st.caption(f"Last updated: {st.session_state.data_container['fetch_time']}")
     else:
         st.warning("Please fetch data to get started.")
