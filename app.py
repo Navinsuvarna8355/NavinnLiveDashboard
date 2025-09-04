@@ -15,9 +15,10 @@ SYMBOL_MAP = {
 }
 
 @st.cache_data(ttl=60)
-def fetch_option_chain(symbol_key):
+def fetch_option_chain(symbol_key, current_time_key):
     """
     Fetches option chain data for a given symbol.
+    A unique `current_time_key` is used to force a cache refresh.
     """
     symbol_name = SYMBOL_MAP.get(symbol_key)
     if not symbol_name:
@@ -35,7 +36,7 @@ def fetch_option_chain(symbol_key):
     
     try:
         resp = session.get(nse_oc_url, timeout=5)
-        resp.raise_for_status()
+        resp.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
         data = resp.json()
         
         return {
@@ -55,7 +56,7 @@ def detect_decay(oc_data, underlying, decay_range=150):
     atm_strikes = [d for d in oc_data if abs(d["strikePrice"] - underlying) <= decay_range and "CE" in d and "PE" in d]
     
     details = []
-    # (rest of the detect_decay function remains the same)
+
     for strike_data in atm_strikes:
         ce_data = strike_data["CE"]
         pe_data = strike_data["PE"]
@@ -152,10 +153,12 @@ with col1:
     
     fetch_button = st.button("Manual Fetch")
 
+    # This is the key logic that forces a refresh
     if fetch_button or st.session_state.data_container is None or selected_symbol != st.session_state.selected_symbol:
         st.session_state.selected_symbol = selected_symbol
         with st.spinner(f"Fetching live data for {selected_symbol}..."):
-            data_dict = fetch_option_chain(selected_symbol)
+            # The corrected call to the cached function with a unique key
+            data_dict = fetch_option_chain(selected_symbol, datetime.now())
             if data_dict:
                 st.session_state.data_container = data_dict
             else:
