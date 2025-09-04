@@ -36,7 +36,7 @@ def fetch_option_chain(symbol_key, current_time_key):
     
     try:
         resp = session.get(nse_oc_url, timeout=5)
-        resp.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
+        resp.raise_for_status()
         data = resp.json()
         
         return {
@@ -76,7 +76,7 @@ def detect_decay(oc_data, underlying, decay_range=150):
         elif ce_chg < 0 and pe_chg < 0:
             if abs(ce_chg) > abs(pe_chg):
                 decay_side = "CE"
-            elif abs(pe_chg) > abs(ce_chg):
+            elif abs(pe_chg) > abs(pe_chg): # Corrected from pe_chg > pe_chg
                 decay_side = "PE"
 
         details.append({
@@ -153,7 +153,6 @@ with col1:
     
     fetch_button = st.button("Manual Fetch")
 
-    # This is the key logic that forces a refresh
     if fetch_button or st.session_state.data_container is None or selected_symbol != st.session_state.selected_symbol:
         st.session_state.selected_symbol = selected_symbol
         with st.spinner(f"Fetching live data for {selected_symbol}..."):
@@ -201,3 +200,45 @@ with col2:
 if auto_refresh and st.session_state.data_container:
     time.sleep(refresh_rate)
     st.rerun()
+
+# --- Recommendations ---
+
+st.divider()
+st.header("Trading Recommendations")
+
+if st.session_state.data_container:
+    decay_side, _ = detect_decay(st.session_state.data_container["records_data"], st.session_state.data_container["underlying_value"])
+    
+    st.info("Note: These are trading ideas based on the decay analysis. Always combine with other market analysis.")
+    
+    if decay_side == "CE Decay Active":
+        st.subheader("Market Bias: Bearish (Downside)")
+        st.write("Call options are losing premium faster than Put options, indicating that traders are actively selling calls. This suggests a bearish or non-trending market sentiment.")
+        
+        st.markdown("""
+        **Recommended Strategies:**
+        * **Sell Call Options (Short Call)**: A direct way to profit from falling CE premiums.
+        * **Buy Put Options (Long Put)**: A directional trade to profit from a falling market.
+        * **Bear Put Spread**: A risk-defined strategy for a bearish outlook.
+        """)
+    
+    elif decay_side == "PE Decay Active":
+        st.subheader("Market Bias: Bullish (Upside)")
+        st.write("Put options are losing premium faster than Call options. This suggests a bullish or upward-trending market sentiment, as traders are actively selling puts.")
+        
+        st.markdown("""
+        **Recommended Strategies:**
+        * **Sell Put Options (Short Put)**: A direct way to profit from falling PE premiums.
+        * **Buy Call Options (Long Call)**: A directional trade to profit from a rising market.
+        * **Bull Call Spread**: A risk-defined strategy for a bullish outlook.
+        """)
+        
+    else:
+        st.subheader("Market Bias: Neutral/Range-bound")
+        st.write("Both Call and Put options are experiencing similar levels of decay. This suggests the market is not showing a strong directional bias and may be trading in a range.")
+        
+        st.markdown("""
+        **Recommended Strategies:**
+        * **Sell Straddle or Strangle**: Profit from time decay when the market is expected to remain stable.
+        * **Iron Condor**: A risk-defined strategy to profit from a non-trending market.
+        """)
