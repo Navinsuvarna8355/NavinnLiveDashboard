@@ -156,7 +156,8 @@ current_time = time.time()
 if st.session_state.data_container is None or selected_symbol != st.session_state.selected_symbol or fetch_button:
     st.session_state.selected_symbol = selected_symbol
     with st.spinner(f"Fetching live data for {selected_symbol}..."):
-        data_dict = fetch_option_chain(selected_symbol, datetime.now())
+        # The key is now based on refresh rate
+        data_dict = fetch_option_chain(selected_symbol, current_time // refresh_rate)
         if data_dict:
             st.session_state.data_container = data_dict
             st.session_state.last_fetch_time = current_time
