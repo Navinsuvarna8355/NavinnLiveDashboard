@@ -36,7 +36,7 @@ def fetch_option_chain(symbol_key, current_time_key):
     
     try:
         resp = session.get(nse_oc_url, timeout=5)
-        resp.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
+        resp.raise_for_status()
         data = resp.json()
         
         return {
@@ -50,13 +50,9 @@ def fetch_option_chain(symbol_key, current_time_key):
         return None
 
 def detect_decay(oc_data, underlying, decay_range=150):
-    """
-    Analyzes option chain data to detect decay bias.
-    """
     atm_strikes = [d for d in oc_data if abs(d["strikePrice"] - underlying) <= decay_range and "CE" in d and "PE" in d]
     
     details = []
-
     for strike_data in atm_strikes:
         ce_data = strike_data["CE"]
         pe_data = strike_data["PE"]
@@ -102,7 +98,6 @@ def detect_decay(oc_data, underlying, decay_range=150):
     return overall_decay_side, df
 
 def create_decay_chart(df):
-    """Creates an interactive bar chart for theta values."""
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
@@ -195,14 +190,16 @@ with col2:
     else:
         st.info("Live analysis will appear here after fetching data.")
             
-# Auto-refresh loop
-if auto_refresh and st.session_state.data_container:
-    # A new line to force a unique key and bypass the cache on every refresh
+# Auto-refresh loop with fresh fetch
+if auto_refresh:
     time.sleep(refresh_rate)
-    st.experimental_rerun()
+    with st.spinner(f"Auto-refreshing data for {st.session_state.selected_symbol}..."):
+        data_dict = fetch_option_chain(st.session_state.selected_symbol, datetime.now())
+        if data_dict:
+            st.session_state.data_container = data_dict
+    st.rerun()
 
 # --- Recommendations ---
-
 st.divider()
 st.header("Trading Recommendations")
 
@@ -217,9 +214,9 @@ if st.session_state.data_container:
         
         st.markdown("""
         **Recommended Strategies:**
-        * **Sell Call Options (Short Call)**: A direct way to profit from falling CE premiums.
-        * **Buy Put Options (Long Put)**: A directional trade to profit from a falling market.
-        * **Bear Put Spread**: A risk-defined strategy for a bearish outlook.
+        * **Sell Call Options (Short Call)**
+        * **Buy Put Options (Long Put)**
+        * **Bear Put Spread**
         """)
     
     elif decay_side == "PE Decay Active":
@@ -228,9 +225,9 @@ if st.session_state.data_container:
         
         st.markdown("""
         **Recommended Strategies:**
-        * **Sell Put Options (Short Put)**: A direct way to profit from falling PE premiums.
-        * **Buy Call Options (Long Call)**: A directional trade to profit from a rising market.
-        * **Bull Call Spread**: A risk-defined strategy for a bullish outlook.
+        * **Sell Put Options (Short Put)**
+        * **Buy Call Options (Long Call)**
+        * **Bull Call Spread**
         """)
         
     else:
@@ -239,6 +236,6 @@ if st.session_state.data_container:
         
         st.markdown("""
         **Recommended Strategies:**
-        * **Sell Straddle or Strangle**: Profit from time decay when the market is expected to remain stable.
-        * **Iron Condor**: A risk-defined strategy to profit from a non-trending market.
+        * **Sell Straddle or Strangle**
+        * **Iron Condor**
         """)
