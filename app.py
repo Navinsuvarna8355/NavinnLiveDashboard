@@ -37,10 +37,17 @@ def fetch_option_chain(symbol_key):
         resp = session.get(nse_oc_url, timeout=5)
         resp.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
         data = resp.json()
-        return data["records"]["data"], data["records"]["underlyingValue"], data["records"]["expiryDates"]
+        
+        # Return a dictionary with all data, including the fetch time
+        return {
+            "records_data": data["records"]["data"],
+            "underlying_value": data["records"]["underlyingValue"],
+            "expiry_dates": data["records"]["expiryDates"],
+            "fetch_time": datetime.now().strftime('%H:%M:%S')
+        }
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching data for {symbol_key}: {e}")
-        return None, None, None
+        return None
 
 def detect_decay(oc_data, underlying, decay_range=150):
     """
@@ -127,10 +134,8 @@ st.set_page_config(page_title="Decay + Directional Bias", layout="wide", page_ic
 st.title("📊 Decay + Directional Bias Detector")
 
 # Initialize Session State
-if "oc_data" not in st.session_state:
-    st.session_state.oc_data = None
-    st.session_state.underlying = None
-    st.session_state.expiry_dates = []
+if "data_container" not in st.session_state:
+    st.session_state.data_container = None
     st.session_state.selected_symbol = "Bank Nifty"
 
 col1, col2 = st.columns([1, 2])
@@ -138,7 +143,6 @@ col1, col2 = st.columns([1, 2])
 with col1:
     st.header("Settings")
     
-    # Dropdown to select the symbol
     selected_symbol = st.selectbox(
         "Select an Index",
         ["Bank Nifty", "Nifty", "Sensex"],
@@ -150,39 +154,38 @@ with col1:
     
     fetch_button = st.button("Manual Fetch")
 
-    # Fetch data on button click, symbol change, or on initial load
-    if fetch_button or st.session_state.oc_data is None or selected_symbol != st.session_state.selected_symbol:
+    if fetch_button or st.session_state.data_container is None or selected_symbol != st.session_state.selected_symbol:
         st.session_state.selected_symbol = selected_symbol
         with st.spinner(f"Fetching live data for {selected_symbol}..."):
-            oc_data, underlying, expiry_dates = fetch_option_chain(selected_symbol)
-            if oc_data:
-                st.session_state.oc_data = oc_data
-                st.session_state.underlying = underlying
-                st.session_state.expiry_dates = expiry_dates
+            data_dict = fetch_option_chain(selected_symbol)
+            if data_dict:
+                st.session_state.data_container = data_dict
             else:
-                st.session_state.oc_data = None # Reset data on failure
+                st.session_state.data_container = None
 
-    if st.session_state.oc_data:
-        st.metric(f"{st.session_state.selected_symbol} Value", st.session_state.underlying)
+    if st.session_state.data_container:
+        st.metric(f"{st.session_state.selected_symbol} Value", st.session_state.data_container["underlying_value"])
         
         selected_expiry = st.selectbox(
             "Select Expiry Date",
-            st.session_state.expiry_dates,
+            st.session_state.data_container["expiry_dates"],
             format_func=lambda d: datetime.strptime(d, '%d-%b-%Y').strftime('%d %b, %Y')
         )
         
-        filtered_oc_data = [d for d in st.session_state.oc_data if d.get("expiryDate") == selected_expiry]
+        filtered_oc_data = [d for d in st.session_state.data_container["records_data"] if d.get("expiryDate") == selected_expiry]
         
-        decay_side, df = detect_decay(filtered_oc_data, st.session_state.underlying)
+        decay_side, df = detect_decay(filtered_oc_data, st.session_state.data_container["underlying_value"])
         
         st.metric("Decay Side", decay_side)
-        st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
+        
+        # The corrected line to display the fetch time from the dictionary
+        st.caption(f"Last updated: {st.session_state.data_container['fetch_time']}")
     else:
         st.warning("Please fetch data to get started.")
 
 with col2:
     st.header("Live Analysis")
-    if st.session_state.oc_data:
+    if st.session_state.data_container:
         tab1, tab2 = st.tabs(["Data Table", "Theta Chart"])
         
         with tab1:
@@ -195,6 +198,6 @@ with col2:
         st.info("Live analysis will appear here after fetching data.")
             
 # Auto-refresh loop
-if auto_refresh and st.session_state.oc_data:
+if auto_refresh and st.session_state.data_container:
     time.sleep(refresh_rate)
     st.rerun()
