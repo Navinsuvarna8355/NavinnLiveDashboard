@@ -1,6 +1,4 @@
 # app.py
-# Streamlit dashboard: multi-index decay bias with no-SciPy theta fallback.
-
 from __future__ import annotations
 import math
 import time
@@ -186,8 +184,4 @@ def bias_color(bias: str) -> str:
         "No Data": "#B00020",
     }.get(bias, "#666666")
 
-def render_bias_block(index_name: str, bias: str, strike: float, ce_t: float, pe_t: float):
-    color = bias_color(bias)
-    st.markdown(f"#### {index_name}")
-    st.markdown(
-        f"""
+def render_bias_block(index_name: str, bias: str, strike: float, ce_t: float,
