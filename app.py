@@ -117,9 +117,10 @@ def get_stock_data(symbol):
         info = compute_oi_pcr_and_underlying(data)
         info['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         info['error'] = None
+        info['symbol'] = symbol # ADDED THIS LINE
     except Exception as e:
         st.error(f"Error fetching data for {symbol}: {e}")
-        info = {'error': str(e)}
+        info = {'error': str(e), 'symbol': symbol} # ADDED 'symbol' KEY HERE
     return info
 
 def get_strategy_data(symbol_info, use_near, ema_signal):
@@ -176,7 +177,7 @@ with col1:
             st.markdown(f"### Signal: <span style='color:{signal_color}'>**{nifty_strategy_data['signal']}**</span>", unsafe_allow_html=True)
             
             st.metric("Live Price", f"₹{nifty_strategy_data['live_price']}")
-            st.metric("Suggested Option", nifty_strategy_data['suggested_option'])
+            st.metric("Suggested Option", nifty_strategy_data['suggested_option']}")
 
             with st.expander("Show Details"):
                 st.write(f"**Trend:** {nifty_strategy_data['trend']}")
@@ -202,7 +203,7 @@ with col2:
             st.markdown(f"### Signal: <span style='color:{signal_color}'>**{banknifty_strategy_data['signal']}**</span>", unsafe_allow_html=True)
 
             st.metric("Live Price", f"₹{banknifty_strategy_data['live_price']}")
-            st.metric("Suggested Option", banknifty_strategy_data['suggested_option'])
+            st.metric("Suggested Option", banknifty_strategy_data['suggested_option']}")
 
             with st.expander("Show Details"):
                 st.write(f"**Trend:** {banknifty_strategy_data['trend']}")
