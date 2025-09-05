@@ -6,8 +6,6 @@ import time
 import plotly.graph_objects as go
 
 # --- Utility Functions ---
-
-# Mapping of symbols to their NSE URL suffixes and display names
 SYMBOL_MAP = {
     "Nifty": "NIFTY",
     "Bank Nifty": "BANKNIFTY",
@@ -15,10 +13,10 @@ SYMBOL_MAP = {
 }
 
 @st.cache_data(ttl=60)
-def fetch_option_chain(symbol_key, current_time_key):
+def fetch_option_chain(symbol_key, current_minute_key):
     """
     Fetches option chain data for a given symbol.
-    A unique `current_time_key` is used to force a cache refresh.
+    A unique `current_minute_key` is used to force a cache refresh every minute.
     """
     symbol_name = SYMBOL_MAP.get(symbol_key)
     if not symbol_name:
@@ -35,7 +33,7 @@ def fetch_option_chain(symbol_key, current_time_key):
     session.headers.update(headers)
     
     try:
-        resp = session.get(nse_oc_url, timeout=5)
+        resp = session.get(nse_oc_url, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         
@@ -76,7 +74,7 @@ def detect_decay(oc_data, underlying, decay_range=150):
         elif ce_chg < 0 and pe_chg < 0:
             if abs(ce_chg) > abs(pe_chg):
                 decay_side = "CE"
-            elif abs(pe_chg) > abs(pe_chg): # Corrected from pe_chg > pe_chg
+            elif abs(pe_chg) > abs(ce_chg):
                 decay_side = "PE"
 
         details.append({
@@ -97,6 +95,162 @@ def detect_decay(oc_data, underlying, decay_range=150):
     if ce_count > pe_count:
         overall_decay_side = "CE Decay Active"
     elif pe_count > ce_count:
+        overall_decay_side = "PE Decay Active"
+
+    return overall_decay_side, df
+
+def create_decay_chart(df):
+    """Creates an interactive bar chart for theta values."""
+    fig = go.Figure()
+    
+    fig.add_trace(go.Bar(
+        x=df['strikePrice'],
+        y=df['CE_theta'].abs(),
+        name='CE Theta (Abs)',
+        marker_color='#FF5733'
+    ))
+    
+    fig.add_trace(go.Bar(
+        x=df['strikePrice'],
+        y=df['PE_theta'].abs(),
+        name='PE Theta (Abs)',
+        marker_color='#0080FF'
+    ))
+
+    fig.update_layout(
+        title='Absolute Theta Values by Strike Price',
+        xaxis_title='Strike Price',
+        yaxis_title='Absolute Theta Value',
+        barmode='group',
+        legend_title='Option Side'
+    )
+    return fig
+
+# --- Streamlit UI ---
+st.set_page_config(page_title="Decay + Directional Bias", layout="wide", page_icon="📈")
+st.title("📊 Decay + Directional Bias Detector")
+
+# Initialize Session State
+if "data_container" not in st.session_state:
+    st.session_state.data_container = None
+    st.session_state.selected_symbol = "Bank Nifty"
+    st.session_state.decay_side = "Loading..."
+    st.session_state.last_fetch_time = time.time()
+    
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    st.header("Settings")
+    
+    selected_symbol = st.selectbox(
+        "Select an Index",
+        ["Bank Nifty", "Nifty", "Sensex"],
+        index=["Bank Nifty", "Nifty", "Sensex"].index(st.session_state.selected_symbol)
+    )
+    
+    auto_refresh = st.checkbox("Auto-Refresh Data", value=True)
+    refresh_rate = st.slider("Refresh Rate (seconds)", 30, 120, 60, step=15)
+    
+    fetch_button = st.button("Manual Fetch")
+
+    # --- Fetch Logic ---
+    current_time = time.time()
+    
+    # Check if a new fetch is needed based on manual button, symbol change, or auto-refresh time
+    if fetch_button or selected_symbol != st.session_state.selected_symbol or \
+       (auto_refresh and (current_time - st.session_state.last_fetch_time >= refresh_rate)):
+        
+        st.session_state.selected_symbol = selected_symbol
+        with st.spinner(f"Fetching live data for {selected_symbol}..."):
+            data_dict = fetch_option_chain(selected_symbol, int(current_time // 60))
+            if data_dict:
+                st.session_state.data_container = data_dict
+                st.session_state.last_fetch_time = current_time
+            else:
+                st.session_state.data_container = None
+        
+        # Rerun to update the entire page with the new data
+        if st.session_state.data_container:
+            st.rerun()
+
+    # --- Display UI in col1 ---
+    if st.session_state.data_container:
+        st.metric(f"{st.session_state.selected_symbol} Value", st.session_state.data_container["underlying_value"])
+        
+        selected_expiry = st.selectbox(
+            "Select Expiry Date",
+            st.session_state.data_container["expiry_dates"],
+            format_func=lambda d: datetime.strptime(d, '%d-%b-%Y').strftime('%d %b, %Y')
+        )
+        
+        filtered_oc_data = [d for d in st.session_state.data_container["records_data"] if d.get("expiryDate") == selected_expiry]
+        
+        decay_side, df = detect_decay(filtered_oc_data, st.session_state.data_container["underlying_value"])
+        
+        # Store decay_side and dataframe in session state for access in other columns
+        st.session_state.decay_side = decay_side
+        st.session_state.df = df
+        
+        st.metric("Decay Side", st.session_state.decay_side)
+        
+        st.caption(f"Last updated: {st.session_state.data_container['fetch_time']}")
+    else:
+        st.warning("Please fetch data to get started.")
+
+with col2:
+    st.header("Live Analysis")
+    if "df" in st.session_state:
+        tab1, tab2 = st.tabs(["Data Table", "Theta Chart"])
+        
+        with tab1:
+            st.dataframe(st.session_state.df, use_container_width=True)
+        
+        with tab2:
+            chart_fig = create_decay_chart(st.session_state.df)
+            st.plotly_chart(chart_fig, use_container_width=True)
+    else:
+        st.info("Live analysis will appear here after fetching data.")
+            
+# --- Recommendations ---
+st.divider()
+st.header("Trading Recommendations")
+
+if "decay_side" in st.session_state and st.session_state.decay_side != "Loading...":
+    decay_side = st.session_state.decay_side
+    
+    st.info("Note: These are trading ideas based on the decay analysis. Always combine with other market analysis.")
+    
+    if decay_side == "CE Decay Active":
+        st.subheader("Market Bias: Bearish (Downside)")
+        st.write("Call options are losing premium faster than Put options, indicating that traders are actively selling calls. This suggests a bearish or non-trending market sentiment.")
+        
+        st.markdown("""
+        **Recommended Strategies:**
+        * **Sell Call Options (Short Call)**: A direct way to profit from falling CE premiums.
+        * **Buy Put Options (Long Put)**: A directional trade to profit from a falling market.
+        * **Bear Put Spread**: A risk-defined strategy for a bearish outlook.
+        """)
+    
+    elif decay_side == "PE Decay Active":
+        st.subheader("Market Bias: Bullish (Upside)")
+        st.write("Put options are losing premium faster than Call options. This suggests a bullish or upward-trending market sentiment, as traders are actively selling puts.")
+        
+        st.markdown("""
+        **Recommended Strategies:**
+        * **Sell Put Options (Short Put)**: A direct way to profit from falling PE premiums.
+        * **Buy Call Options (Long Call)**: A directional trade to profit from a rising market.
+        * **Bull Call Spread**: A risk-defined strategy for a bullish outlook.
+        """)
+        
+    else:
+        st.subheader("Market Bias: Neutral/Range-bound")
+        st.write("Both Call and Put options are experiencing similar levels of decay. This suggests the market is not showing a strong directional bias and may be trading in a range.")
+        
+        st.markdown("""
+        **Recommended Strategies:**
+        * **Sell Straddle or Strangle**: Profit from time decay when the market is expected to remain stable.
+        * **Iron Condor**: A risk-defined strategy to profit from a non-trending market.
+        """)    elif pe_count > ce_count:
         overall_decay_side = "PE Decay Active"
 
     return overall_decay_side, df
