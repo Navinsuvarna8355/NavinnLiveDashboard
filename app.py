@@ -14,12 +14,17 @@ SYMBOL_MAP = {
 
 @st.cache_data(ttl=60)
 def fetch_option_chain(symbol_key, current_time_key):
+    """
+    Fetches option chain data for a given symbol.
+    A unique `current_time_key` is used to force a cache refresh.
+    """
     symbol_name = SYMBOL_MAP.get(symbol_key)
     if not symbol_name:
         st.error("Invalid symbol selected.")
         return None
 
     nse_oc_url = f"https://www.nseindia.com/api/option-chain-indices?symbol={symbol_name}"
+    
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Accept-Language": "en-US,en;q=0.9",
@@ -28,7 +33,7 @@ def fetch_option_chain(symbol_key, current_time_key):
     session.headers.update(headers)
     
     try:
-        resp = session.get(nse_oc_url, timeout=5)
+        resp = session.get(nse_oc_url, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         
@@ -44,14 +49,17 @@ def fetch_option_chain(symbol_key, current_time_key):
 
 def detect_decay(oc_data, underlying, decay_range=150):
     atm_strikes = [d for d in oc_data if abs(d["strikePrice"] - underlying) <= decay_range and "CE" in d and "PE" in d]
+    
     details = []
     for strike_data in atm_strikes:
         ce_data = strike_data["CE"]
         pe_data = strike_data["PE"]
+
         ce_theta = ce_data.get("theta", 0)
         pe_theta = pe_data.get("theta", 0)
         ce_chg = ce_data.get("change", 0)
         pe_chg = pe_data.get("change", 0)
+
         decay_side = "Both"
         if ce_theta != 0 and pe_theta != 0:
             if abs(ce_theta) > abs(pe_theta) and ce_chg < 0:
@@ -63,6 +71,7 @@ def detect_decay(oc_data, underlying, decay_range=150):
                 decay_side = "CE"
             elif abs(pe_chg) > abs(ce_chg):
                 decay_side = "PE"
+
         details.append({
             "strikePrice": strike_data["strikePrice"],
             "CE_theta": ce_theta,
@@ -71,14 +80,17 @@ def detect_decay(oc_data, underlying, decay_range=150):
             "PE_Change": pe_chg,
             "Decay_Side": decay_side
         })
+    
     df = pd.DataFrame(details).sort_values(by="strikePrice")
     ce_count = df[df['Decay_Side'] == 'CE'].shape[0]
     pe_count = df[df['Decay_Side'] == 'PE'].shape[0]
+    
     overall_decay_side = "Both Sides Decay"
     if ce_count > pe_count:
         overall_decay_side = "CE Decay Active"
     elif pe_count > ce_count:
         overall_decay_side = "PE Decay Active"
+
     return overall_decay_side, df
 
 def create_decay_chart(df):
@@ -133,16 +145,20 @@ current_time = time.time()
 if st.session_state.data_container is None or selected_symbol != st.session_state.selected_symbol or fetch_button:
     st.session_state.selected_symbol = selected_symbol
     with st.spinner(f"Fetching live data for {selected_symbol}..."):
-        data_dict = fetch_option_chain(selected_symbol, datetime.now())
+        data_dict = fetch_option_chain(selected_symbol, current_time // refresh_rate)
         if data_dict:
             st.session_state.data_container = data_dict
             st.session_state.last_fetch_time = current_time
         else:
             st.session_state.data_container = None
 
-# --- Auto-refresh logic (triggered only after a successful fetch)
-if auto_refresh and st.session_state.data_container and (current_time - st.session_state.last_fetch_time >= refresh_rate):
-    st.session_state.last_fetch_time = current_time
+# --- Auto-refresh logic (UPDATED) ---
+if auto_refresh and (current_time - st.session_state.last_fetch_time >= refresh_rate):
+    with st.spinner(f"Auto-refreshing data for {st.session_state.selected_symbol}..."):
+        data_dict = fetch_option_chain(st.session_state.selected_symbol, current_time // refresh_rate)
+        if data_dict:
+            st.session_state.data_container = data_dict
+            st.session_state.last_fetch_time = current_time
     st.rerun()
 
 # --- Left Column UI ---
@@ -170,7 +186,7 @@ with col2:
             st.dataframe(df, width='stretch')
         with tab2:
             chart_fig = create_decay_chart(df)
-            st.plotly_chart(chart_fig, width='stretch')
+            st.plotly_chart(chart_fig, use_container_width=True)
     else:
         st.info("Live analysis will appear here after fetching data.")
 
@@ -185,24 +201,19 @@ if st.session_state.data_container:
         st.write("Call options are losing premium faster than Put options, indicating that traders are actively selling calls. This suggests a bearish or non-trending market sentiment.")
         st.markdown("""
         **Recommended Strategies:**
-        * **Sell Call Options (Short Call)**: A direct way to profit from falling CE premiums.
-        * **Buy Put Options (Long Put)**: A directional trade to profit from a falling market.
-        * **Bear Put Spread**: A risk-defined strategy for a bearish outlook.
+        * **Sell Call Options (Short Call)**
+        * **Buy Put Options (Long Put)**
+        * **Bear Put Spread**
         """)
     elif decay_side == "PE Decay Active":
         st.subheader("Market Bias: Bullish (Upside)")
         st.write("Put options are losing premium faster than Call options. This suggests a bullish or upward-trending market sentiment, as traders are actively selling puts.")
         st.markdown("""
         **Recommended Strategies:**
-        * **Sell Put Options (Short Put)**: A direct way to profit from falling PE premiums.
-        * **Buy Call Options (Long Call)**: A directional trade to profit from a rising market.
-        * **Bull Call Spread**: A risk-defined strategy for a bullish outlook.
+        * **Sell Put Options (Short Put)**
+        * **Buy Call Options (Long Call)**
+        * **Bull Call Spread**
         """)
     else:
         st.subheader("Market Bias: Neutral/Range-bound")
-        st.write("Both Call and Put options are experiencing similar levels of decay. This suggests the market is not showing a strong directional bias and may be trading in a range.")
-        st.markdown("""
-        **Recommended Strategies:**
-        * **Sell Straddle or Strangle**: Profit from time decay when the market is expected to remain stable.
-        * **Iron Condor**: A risk-defined strategy to profit from a non-trending market.
-        """)
+        st.write
