@@ -14,17 +14,12 @@ SYMBOL_MAP = {
 
 @st.cache_data(ttl=60)
 def fetch_option_chain(symbol_key, current_time_key):
-    """
-    Fetches option chain data for a given symbol.
-    A unique `current_time_key` is used to force a cache refresh.
-    """
     symbol_name = SYMBOL_MAP.get(symbol_key)
     if not symbol_name:
         st.error("Invalid symbol selected.")
         return None
 
     nse_oc_url = f"https://www.nseindia.com/api/option-chain-indices?symbol={symbol_name}"
-    
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Accept-Language": "en-US,en;q=0.9",
@@ -33,9 +28,8 @@ def fetch_option_chain(symbol_key, current_time_key):
     session.headers.update(headers)
     
     try:
-        # Increased timeout to 15 seconds to prevent read timeouts
-        resp = session.get(nse_oc_url, timeout=15)
-        resp.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
+        resp = session.get(nse_oc_url, timeout=5)
+        resp.raise_for_status()
         data = resp.json()
         
         return {
@@ -49,24 +43,16 @@ def fetch_option_chain(symbol_key, current_time_key):
         return None
 
 def detect_decay(oc_data, underlying, decay_range=150):
-    """
-    Analyzes option chain data to detect decay bias.
-    """
     atm_strikes = [d for d in oc_data if abs(d["strikePrice"] - underlying) <= decay_range and "CE" in d and "PE" in d]
-    
     details = []
-
     for strike_data in atm_strikes:
         ce_data = strike_data["CE"]
         pe_data = strike_data["PE"]
-
         ce_theta = ce_data.get("theta", 0)
         pe_theta = pe_data.get("theta", 0)
         ce_chg = ce_data.get("change", 0)
         pe_chg = pe_data.get("change", 0)
-
         decay_side = "Both"
-
         if ce_theta != 0 and pe_theta != 0:
             if abs(ce_theta) > abs(pe_theta) and ce_chg < 0:
                 decay_side = "CE"
@@ -77,7 +63,6 @@ def detect_decay(oc_data, underlying, decay_range=150):
                 decay_side = "CE"
             elif abs(pe_chg) > abs(ce_chg):
                 decay_side = "PE"
-
         details.append({
             "strikePrice": strike_data["strikePrice"],
             "CE_theta": ce_theta,
@@ -86,38 +71,30 @@ def detect_decay(oc_data, underlying, decay_range=150):
             "PE_Change": pe_chg,
             "Decay_Side": decay_side
         })
-    
     df = pd.DataFrame(details).sort_values(by="strikePrice")
-    
     ce_count = df[df['Decay_Side'] == 'CE'].shape[0]
     pe_count = df[df['Decay_Side'] == 'PE'].shape[0]
-    
     overall_decay_side = "Both Sides Decay"
     if ce_count > pe_count:
         overall_decay_side = "CE Decay Active"
     elif pe_count > ce_count:
         overall_decay_side = "PE Decay Active"
-
     return overall_decay_side, df
 
 def create_decay_chart(df):
-    """Creates an interactive bar chart for theta values."""
     fig = go.Figure()
-    
     fig.add_trace(go.Bar(
         x=df['strikePrice'],
         y=df['CE_theta'].abs(),
         name='CE Theta (Abs)',
         marker_color='#FF5733'
     ))
-    
     fig.add_trace(go.Bar(
         x=df['strikePrice'],
         y=df['PE_theta'].abs(),
         name='PE Theta (Abs)',
         marker_color='#0080FF'
     ))
-
     fig.update_layout(
         title='Absolute Theta Values by Strike Price',
         xaxis_title='Strike Price',
@@ -131,7 +108,7 @@ def create_decay_chart(df):
 st.set_page_config(page_title="Decay + Directional Bias", layout="wide", page_icon="📈")
 st.title("📊 Decay + Directional Bias Detector")
 
-# Initialize Session State
+# Init session state
 if "data_container" not in st.session_state:
     st.session_state.data_container = None
     st.session_state.selected_symbol = "Bank Nifty"
@@ -153,8 +130,6 @@ with col1:
 
 # --- Fetch Logic ---
 current_time = time.time()
-
-# Force a fetch if it's the first run, a new symbol is selected, or the manual button is pressed.
 if st.session_state.data_container is None or selected_symbol != st.session_state.selected_symbol or fetch_button:
     st.session_state.selected_symbol = selected_symbol
     with st.spinner(f"Fetching live data for {selected_symbol}..."):
